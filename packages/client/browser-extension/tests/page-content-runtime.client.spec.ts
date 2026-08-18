@@ -118,11 +118,16 @@ describe('page content reader', () => {
 
   it('executes validated page actions and preserves stale-reference errors', () => {
     const runtime = runtimeApi()
-    const actPage = vi.fn((operation: BridgePageActionOperation): BridgePageActionReceipt => ({
-      pageId: operation.pageId,
-      ref: operation.ref,
-      action: 'filled' as const,
-    }))
+    const actPage = vi.fn((operation: BridgePageActionOperation): BridgePageActionReceipt => {
+      if (operation.kind === 'scroll-page') {
+        throw new Error('this test only fills a field')
+      }
+      return {
+        pageId: operation.pageId,
+        ref: operation.ref,
+        action: 'filled',
+      }
+    })
     installPageReader(runtime.api, vi.fn(), actPage)
     const sendResponse = vi.fn()
     const operation = { kind: 'fill-page-element' as const, pageId, ref: 'e1', value: 'deepseek', submit: true }
