@@ -2,7 +2,7 @@
 // Mounted on 'conversation.composer.dock' so it sticks with the composer in the
 // active conversation scrollport (see ConversationRoot data-conversation-scroll).
 
-import { Fragment, memo, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, memo, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ConversationSnapshot, UseProjection } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
@@ -160,6 +160,30 @@ export interface StatsLineProps {
   t: ComposerBarProps['t']
 }
 
+/**
+ * True only in the Chrome side-panel iframe. Desktop stats stay a single
+ * ellipsis row; the plugin collapses timings behind an expand control.
+ * @returns whether the current page tagged itself as the side panel.
+ */
+function isSidePanelSurface(): boolean {
+  if (typeof window === 'undefined') return false
+  return new URLSearchParams(window.location.search).get('dsh-surface') === 'side-panel'
+}
+
+/**
+ * Join pipe-separated stats groups with the same separator the desktop row uses.
+ * @param items - already-localized group strings, empty groups omitted by the caller.
+ * @returns inline nodes for one stats row.
+ */
+function renderGroups(items: readonly string[]): ReactNode {
+  return items.map((group, i) => (
+    <Fragment key={group}>
+      {i > 0 && <><span className={css.sep} aria-hidden="true">|</span>{' '}</>}
+      <span>{group}</span>
+    </Fragment>
+  ))
+}
+
 export const StatsLine = memo(function StatsLine({ useSession, useProjection, t }: StatsLineProps) {
   const settledNodes = useSession(s => s.chat.legacy.nodes)
   const usage = useProjection('tokenUsage')
@@ -169,14 +193,16 @@ export const StatsLine = memo(function StatsLine({ useSession, useProjection, t 
   // while no projection value is served.
   const projected = useProjection('sessionStats')
   const stats = useMemo(() => projected ?? deriveStats(settledNodes), [projected, settledNodes])
-  // Pipe-separated groups (figma stats strip); a group with no data drops out whole.
-  const groups: string[] = []
+  const compact = isSidePanelSurface()
+  let counts: string | undefined
+  const extra: string[] = []
+  let tokens: string | undefined
   if (stats.steps > 0) {
-    groups.push(t('stats.counts', { turns: stats.turns, steps: stats.steps }))
+    counts = t('stats.counts', { turns: stats.turns, steps: stats.steps })
     const durations: string[] = []
     if (stats.llmMs > 0) durations.push(t('stats.llm', { duration: formatDuration(stats.llmMs) }))
     if (stats.toolMs > 0) durations.push(t('stats.toolCall', { duration: formatDuration(stats.toolMs) }))
-    if (durations.length > 0) groups.push(durations.join(' · '))
+    if (durations.length > 0) extra.push(durations.join(' · '))
     const speeds: string[] = []
     if (stats.ttftSteps > 0) {
       speeds.push(t('stats.ttftAverage', { duration: formatDuration(stats.ttftMs / stats.ttftSteps) }))
@@ -186,7 +212,7 @@ export const StatsLine = memo(function StatsLine({ useSession, useProjection, t 
         throughput: formatTokensPerSecond(stats.decodeTokens / (stats.decodeMs / 1_000)),
       }))
     }
-    if (speeds.length > 0) groups.push(speeds.join(' · '))
+    if (speeds.length > 0) extra.push(speeds.join(' · '))
   }
   // Context occupancy deliberately lives on the composer's ContextMeter ring,
   // not here — one home per fact.
@@ -197,15 +223,15 @@ export const StatsLine = memo(function StatsLine({ useSession, useProjection, t 
   if (usage !== undefined
     && (billedInputTokens(usage) > 0 || usage.outputTokens > 0)) {
     const cacheHit = cacheHitPercent(usage)
-    if (cacheHit !== null) groups.push(t('stats.cacheHit', { percent: cacheHit }))
-    groups.push(t('stats.tokens', {
+    if (cacheHit !== null) extra.push(t('stats.cacheHit', { percent: cacheHit }))
+    tokens = t('stats.tokens', {
       input: formatTokens(billedInputTokens(usage)),
       output: formatTokens(usage.outputTokens),
-    }))
+    })
   }
+  const summary = [counts, tokens].filter((group): group is string => group !== undefined)
+  const groups = [counts, ...extra, tokens].filter((group): group is string => group !== undefined)
   const line = groups.join(' | ')
-  // The row elides with ellipsis when overlong; a delayed hover tooltip carries
-  // the full line, enabled only while content is actually clipped.
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [truncated, setTruncated] = useState(false)
   useLayoutEffect(() => {
@@ -219,15 +245,29 @@ export const StatsLine = memo(function StatsLine({ useSession, useProjection, t 
     return () => { observer.disconnect() }
   }, [line])
   if (groups.length === 0) return null
+
+  if (compact) {
+    return (
+      <Tooltip
+        label={line}
+        side="top"
+        delayMs={500}
+        disabled={extra.length === 0}
+        maxWidth={320}
+      >
+        <div className={css.root}>
+          {renderGroups(summary)}
+        </div>
+      </Tooltip>
+    )
+  }
+
+  // The row elides with ellipsis when overlong; a delayed hover tooltip carries
+  // the full line, enabled only while content is actually clipped.
   return (
     <Tooltip label={line} side="top" delayMs={500} disabled={!truncated}>
       <div ref={rootRef} className={css.root}>
-        {groups.map((group, i) => (
-          <Fragment key={group}>
-            {i > 0 && <><span className={css.sep} aria-hidden>|</span>{' '}</>}
-            <span>{group}</span>
-          </Fragment>
-        ))}
+        {renderGroups(groups)}
       </div>
     </Tooltip>
   )

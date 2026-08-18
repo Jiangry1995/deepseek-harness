@@ -668,6 +668,25 @@ describe('ChatView', () => {
     expect(view.getAllByText(/用时 19秒/)).toHaveLength(1)
   })
 
+  it('folds turn timing into a question-mark control for the side panel', () => {
+    const h = makeHarness({
+      nodes: [
+        user(1, 'hi'),
+        assistant(2, 'mid-turn text'),
+        assistant(16, 'final answer'),
+        toolResult(18, 'trailing'),
+      ],
+      turnTimings: new Map([[1, { startTime: 1_000, endTime: 20_000 }]]),
+      turnEnds: new Map([[1, 20]]),
+    })
+    const view = render(
+      <div data-surface="side-panel">
+        <h.ChatView {...h.props} />
+      </div>,
+    )
+    expect(view.getByRole('button', { name: /用时 19秒/ }).getAttribute('data-timing-hint')).toBe('')
+  })
+
   it('the settled footer appends first-step ttft and turn decode throughput', () => {
     const first: AssistantMessageNode = {
       kind: 'assistant', seq: 2, time: 2_000, turn: 1, step: 1, blocks: [{ kind: 'text', text: 'mid' }],

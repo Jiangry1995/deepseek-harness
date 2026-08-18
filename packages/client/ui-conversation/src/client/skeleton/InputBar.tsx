@@ -752,9 +752,14 @@ export function InputBar({
             {leftItems}
           </div>
           <div className={css.trailing}>
-            {rightItems}
-            {renderSlot('conversation.input.model', { locked: modelSeatLocked })}
-            <ContextMeter useProjection={useProjection} t={t} />
+            {/* Side-panel CSS hides extras/meter and lets modelSeat grow; desktop uses display:contents. */}
+            <div className={css.trailingExtras}>{rightItems}</div>
+            <div className={css.modelSeat}>
+              {renderSlot('conversation.input.model', { locked: modelSeatLocked })}
+            </div>
+            <div className={css.meter}>
+              <ContextMeter useProjection={useProjection} t={t} />
+            </div>
             {interruptible && (
               <Tooltip label={t('input.stop')} side="top" delayMs={500}>
                 <button

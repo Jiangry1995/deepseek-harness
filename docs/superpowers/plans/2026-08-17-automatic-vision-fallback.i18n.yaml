@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/superpowers/plans/2026-08-17-automatic-vision-fallback.md
+2026-08-17-automatic-vision-fallback.md: fc3a085dc84f5a2f0f411496cf970ee993e2806c
+2026-08-17-automatic-vision-fallback.zh.md: 6a0a97b890aea5fcd3b73101e5258cfa87815075

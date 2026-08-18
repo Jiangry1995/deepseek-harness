@@ -22,7 +22,9 @@
     },
     {
       "path": "../../credentials/credentials"
-
+    },
+    {
+      "path": "../../web/browser"
     },
     {
       "path": "../../extensions/cordis-host-runner"

@@ -391,4 +391,30 @@ describe('StatsLine', () => {
     act(() => { set({ running: true }) })
     expect(renders).toBe(before)
   })
+
+  it('keeps plugin stats to one row and reveals the rest in a hover tooltip', () => {
+    vi.useFakeTimers()
+    const href = window.location.href
+    const url = new URL(href)
+    url.searchParams.set('dsh-surface', 'side-panel')
+    window.history.replaceState({}, '', url)
+    try {
+      const timed: AssistantMessageNode = {
+        ...assistant(1, 1, { outputTokens: 60 }),
+        timing: { stepStartTime: 1_000, firstTokenTime: 1_800, completedTime: 4_800 },
+      }
+      const { source } = makeSource({ nodes: [timed] })
+      const view = render(<StatsLine {...props(source)} t={t} />)
+      expect(view.container.textContent).toContain('1 轮 · 1 步')
+      expect(view.container.textContent).toContain('输入 100 tok')
+      expect(view.container.textContent).not.toContain('LLM')
+      expect(view.queryByRole('button', { name: '展开统计' })).toBeNull()
+      fireEvent.mouseEnter(view.container.firstElementChild!)
+      act(() => { vi.advanceTimersByTime(500) })
+      expect(view.container.querySelector('[role="tooltip"]')?.textContent).toContain('LLM 3.8s')
+      expect(view.container.querySelector('[role="tooltip"]')?.textContent).toContain('缓存命中 90%')
+    } finally {
+      window.history.replaceState({}, '', href)
+    }
+  })
 })

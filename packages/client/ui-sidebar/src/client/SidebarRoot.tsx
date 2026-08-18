@@ -9,6 +9,8 @@
  * the New Session button and the foot is the `sidebar.workspaces` registrant's,
  * and the foot holds `sidebar.settings` plus `sidebar.footer.action`; the shell
  * hands them the wide flag (plus an expand request callback for the browser).
+ * The Chrome side-panel iframe (`surface: 'side-panel'`) skips this column and
+ * renders SidePanelShell instead: a top chrome bar plus a history drawer.
  *
  * The column also owns whether the scroll regions nested in it draw a
  * scrollbar at all: the shell tracks the pointer and rebinds ui-theme's
@@ -23,6 +25,7 @@ import {
   Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SidebarRootComponentProps } from './contract/slots.ts'
+import { SidePanelShell } from './SidePanelShell.tsx'
 import css from './SidebarRoot.module.css'
 
 /** Wide-content unmount delay; matches the 150ms wide-content fade-out. */
@@ -41,7 +44,25 @@ const SCROLLBAR_LINGER_MS = 2000
  * @param props - composed slot props (runtime share + injected callbacks, contract/slots.ts).
  * @returns the sidebar element tree.
  */
-export function SidebarRoot({
+export function SidebarRoot(props: SidebarRootComponentProps) {
+  if (props.surface === 'side-panel') {
+    return (
+      <SidePanelShell
+        startSession={props.startSession}
+        t={props.t}
+        renderSlot={props.renderSlot}
+        useSessions={props.useSessions}
+      />
+    )
+  }
+  return <DesktopSidebarColumn {...props} />
+}
+
+/**
+ * Desktop sidebar column: expanded list or the 56px collapsed rail.
+ * Isolated so the side-panel branch does not run this fold-state machine.
+ */
+function DesktopSidebarColumn({
   collapsed,
   width,
   startSession,

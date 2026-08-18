@@ -28,13 +28,20 @@ const FILE_REFERENCE_PROMPT = fileURLToPath(new URL(
  * The catalog the shipped Web composition puts in front of the model, minus the
  * ripgrep-dependent pair below. The absences are deliberate, not incidental
  * gaps: the `cordis_*` toolset executes model-written JavaScript that no
- * sandbox row confines, `web_fetch` chooses its own request target, and
- * `mcp_*` servers spawn outside `ctx.shell`. The composition Agent Note owns the
- * rationale and its sources.
+ * sandbox row confines, and `mcp_*` servers spawn outside `ctx.shell`. The
+ * composition Agent Note owns the rationale and its sources.
  */
 const EXPECTED_TOOLS = [
   'ask_user_question',
-  'bash',
+  process.platform === 'win32' ? 'pwsh' : 'bash',
+  'browser_activate_tab',
+  'browser_click',
+  'browser_close_tab',
+  'browser_fill',
+  'browser_list_tabs',
+  'browser_open_tab',
+  'browser_read_page',
+  'browser_select',
   'create_goal',
   'edit',
   'exit_plan_mode',
@@ -53,10 +60,11 @@ const EXPECTED_TOOLS = [
   'subagent_fork',
   'todo_write',
   'update_goal',
+  'web_fetch',
   'web_search',
   'workflow',
   'write',
-]
+].toSorted()
 
 /**
  * `glob` and `grep` come from `dsh-tool-fs-search`, which spawns the PACKAGED

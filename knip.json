@@ -481,6 +481,16 @@
         "tests/**/*.ts"
       ]
     },
+    "packages/llm/llm-vision-fallback": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
     "packages/session/session-title-first-prompt-llm": {
       "entry": [
         "tests/**/*.spec.ts",
@@ -524,6 +534,24 @@
       "entry": [
         "tests/**/*.spec.ts",
         "tests/**/*.e2e.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/web/web-search-tavily": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
+    "packages/web/web-search-firecrawl": {
+      "entry": [
+        "tests/**/*.spec.ts"
       ],
       "project": [
         "src/**/*.ts",
@@ -769,6 +797,11 @@
       ]
     },
     "packages/bundle/base": {
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
+    "packages/bundle/vision-fallback": {
       "ignoreDependencies": [
         "@deepseek-ai/.+"
       ]

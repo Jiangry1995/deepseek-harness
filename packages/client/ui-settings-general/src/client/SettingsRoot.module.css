@@ -2,7 +2,12 @@
    foot trigger row + centered 1080x700 modal panel. The trigger uses the
    sidebar's 34px compact row / 36px rail circle rhythm; the
    panel is a two-column layout — 188px nav rail + content column with a
-   54px header and the 24px-padded options area. */
+   54px header and the 24px-padded options area.
+
+   Chrome side-panel / sidebar-plugin viewports are often 360–480px. Keeping
+   the 188px rail there leaves ~100px for the form, so CJK labels wrap one
+   glyph per line. Below 640px the panel fills the viewport and the rail
+   collapses to icon-only; labels stay in the DOM for the accessible name. */
 
 /* Trigger row: match the other wide sidebar controls' compact vertical rhythm. */
 .trigger {
@@ -39,6 +44,20 @@
   gap: 0;
   padding: 0;
   border-radius: 50%;
+}
+
+/* Plugin chrome: same square as 新建, not the 36px rail circle. */
+:global([data-surface='side-panel']) .trigger.rail {
+  width: var(--dsh-side-panel-chrome-icon, 20px);
+  height: var(--dsh-side-panel-chrome-icon, 20px);
+  margin: 0;
+  border-radius: 6px;
+  color: var(--dsw-alias-label-primary);
+}
+
+:global([data-surface='side-panel']) .trigger.rail svg {
+  width: 16px;
+  height: 16px;
 }
 
 .triggerLabel {
@@ -121,6 +140,7 @@
 /* Nav cell (figma .Setting-nav-cell 501:29962): 164x40, r12, pad
    (12,9,16,9), gap 8; label 14/400 lh22; selected fill #EBEEF2. */
 .navCell {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -210,8 +230,10 @@
 /* Options area (figma Options 501:29983): pad (24,0,24,24), scrolls. */
 .options {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   padding: 0 24px 24px;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
@@ -223,4 +245,62 @@
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+/* Side-panel / sidebar-plugin: reclaim the 188px rail so the form can wrap
+   as ordinary paragraphs instead of a single-glyph column. */
+@media (max-width: 640px) {
+  .overlay {
+    align-items: stretch;
+    justify-content: stretch;
+  }
+
+  .panel {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .nav {
+    width: 52px;
+    gap: 12px;
+    padding: 16px 6px 0;
+  }
+
+  .navTitle {
+    padding: 0;
+    font-size: 13px;
+    line-height: 18px;
+    text-align: center;
+  }
+
+  .navCell {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .navLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .header {
+    height: auto;
+    min-height: 44px;
+    padding: 12px 10px 8px;
+  }
+
+  .options {
+    padding: 0 12px 16px;
+  }
 }

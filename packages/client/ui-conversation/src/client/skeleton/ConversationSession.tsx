@@ -103,26 +103,34 @@ export function ConversationSessionHeader({
                 {renderSlot('conversation.session.header.actions', {})}
               </div>
             </div>
+            {/* Desktop: viewSwitch is display:contents so utilities stay on the
+                title row and tabs wrap below. Plugin chrome: download is a
+                sibling icon; the card wraps only 对话/轨迹 so its side gaps
+                can open without stretching + / 设置. */}
             <div className={css.headerUtilities}>
               {renderSlot('conversation.session.header.utilities', {})}
             </div>
+            {tabs.length > 1 && (
+              <div className={css.viewSwitch} data-session-view-switch="">
+                <div className={css.tabs} role="tablist">
+                  {tabs.map(viewTab => (
+                    <button
+                      key={viewTab.id}
+                      type="button"
+                      role="tab"
+                      aria-label={viewTab.label}
+                      aria-selected={viewTab.id === active?.id}
+                      title={viewTab.label}
+                      className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
+                      onClick={() => { actions.setView(viewTab.id) }}
+                    >
+                      {viewTab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-          {tabs.length > 1 && (
-            <div className={css.tabs} role="tablist">
-              {tabs.map(viewTab => (
-                <button
-                  key={viewTab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={viewTab.id === active?.id}
-                  className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
-                  onClick={() => { actions.setView(viewTab.id) }}
-                >
-                  {viewTab.label}
-                </button>
-              ))}
-            </div>
-          )}
         </>
       )}
     </header>

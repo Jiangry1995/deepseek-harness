@@ -147,6 +147,35 @@ export class WebRuntime extends Service {
   }
 
   /**
+   * Probe one registered search provider by id, bypassing configured selection.
+   * Runs a minimal search so the settings surface can verify credentials and
+   * endpoint reachability without changing which provider the seam selects.
+   * @param providerId - registry id (`tavily`, `firecrawl`, …).
+   * @param signal - optional cancellation signal forwarded to the provider.
+   * @returns how many sources the probe search returned.
+   */
+  async probeSearch(
+    providerId: string,
+    signal?: AbortSignal,
+  ): Promise<{ providerId: string; sourceCount: number }> {
+    const provider = this.searchProviders.get(providerId)
+    if (provider === undefined) {
+      throw new WebError(
+        `web search provider "${providerId}" is not registered`,
+        'WEB_PROVIDER_CONFIGURED_MISSING',
+      )
+    }
+    if (!provider.available()) {
+      throw new WebError(
+        `web search provider "${providerId}" is registered but unavailable`,
+        'WEB_PROVIDER_CONFIGURED_UNAVAILABLE',
+      )
+    }
+    const result = await provider.search({ query: 'connectivity probe', maxResults: 1 }, signal)
+    return { providerId, sourceCount: capSources(result, 1).sources.length }
+  }
+
+  /**
    * Retrieve one URL through the selected provider. Resolves the provider at
    * call time with the selection rules above; throws {@link WebError} when the
    * capability cannot run. A non-2xx response is a result, not a throw.

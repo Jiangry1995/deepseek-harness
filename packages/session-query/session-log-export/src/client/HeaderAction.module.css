@@ -34,3 +34,22 @@
 .sessionLogButton span {
   white-space: nowrap;
 }
+
+/* Plugin chrome: download glyph only so the capsule does not crowd the title. */
+:global([data-surface='side-panel']) .sessionLogButton {
+  min-width: 20px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+}
+
+:global([data-surface='side-panel']) .sessionLogButton span {
+  display: none;
+}
+
+:global([data-surface='side-panel']) .sessionLogButton svg {
+  width: 16px;
+  height: 16px;
+}

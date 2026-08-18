@@ -597,6 +597,23 @@ describe('WorkerThreadCodeRuntime — hostile programs (real workers)', () => {
     expect(result.value).toEqual({ name: 'ToolCallError', toolName: 'bad', message: 'binding resolution must be lossless JSON' })
   })
 
+  it('treats a missing tool argument as an empty JSON object', async () => {
+    const { runtime } = await setup()
+    const seen: unknown[] = []
+    const result = await runtime.run({
+      program: 'return await tools.read()',
+      bindings: tools({
+        read: async (args) => {
+          seen.push(args)
+          return { ok: true }
+        },
+      }),
+    })
+    expect(result.error).toBeUndefined()
+    expect(seen).toEqual([{}])
+    expect(result.value).toEqual({ ok: true })
+  })
+
   it('rejects lossy binding arguments in the worker before invoking the host binding', async () => {
     const { runtime } = await setup()
     let calls = 0

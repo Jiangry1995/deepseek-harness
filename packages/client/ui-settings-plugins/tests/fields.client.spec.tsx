@@ -94,12 +94,12 @@ describe('SecretField', () => {
     disabled: false,
   }
 
-  it('stages the draft and never renders it', () => {
+  it('stages the draft as a password field by default', () => {
     const onEdit = vi.fn()
     render(
       <SecretField
         {...secret}
-        text=""
+        text="ds-secret"
         configured={false}
         stateLabel="No key is configured."
         onEdit={onEdit}
@@ -107,9 +107,44 @@ describe('SecretField', () => {
     )
     const input = screen.getByLabelText('API key')
 
-    fireEvent.change(input, { target: { value: 'ds-secret' } })
+    fireEvent.change(input, { target: { value: 'ds-next' } })
 
-    expect(onEdit).toHaveBeenCalledWith('ds-secret')
+    expect(onEdit).toHaveBeenCalledWith('ds-next')
+    expect(input).toHaveProperty('type', 'password')
+    expect(input).toHaveProperty('value', 'ds-secret')
+  })
+
+  it('shows the written value with no empty-state placeholder mask', () => {
+    const { rerender } = render(
+      <SecretField
+        {...secret}
+        text=""
+        configured
+        stateLabel="A key is configured."
+        onEdit={vi.fn()}
+      />,
+    )
+    expect(screen.getByLabelText('API key')).toHaveProperty('value', '')
+    expect(screen.getByLabelText('API key')).toHaveProperty('placeholder', '')
+    expect(screen.getByRole('button', { name: 'Show API key' })).toHaveProperty('disabled', true)
+
+    rerender(
+      <SecretField
+        {...secret}
+        text="ds-secret"
+        configured
+        stateLabel="A key is configured."
+        onEdit={vi.fn()}
+      />,
+    )
+    const input = screen.getByLabelText('API key')
+    expect(input).toHaveProperty('type', 'password')
+    expect(input).toHaveProperty('value', 'ds-secret')
+    expect(input).toHaveProperty('placeholder', '')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show API key' }))
+    expect(input).toHaveProperty('type', 'text')
+    fireEvent.click(screen.getByRole('button', { name: 'Hide API key' }))
     expect(input).toHaveProperty('type', 'password')
   })
 

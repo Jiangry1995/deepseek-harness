@@ -4,10 +4,12 @@
  *
  * The list is the profile's `models` array as the card holds it: an empty list
  * means "serve this route's built-in catalog", and any entry replaces that
- * catalog, so a row is only ever added deliberately. Fetching asks the endpoint
- * **the form currently shows** — including a key typed but not yet saved — so
- * adding a provider is one pass instead of save-then-return; the reply is
- * candidates the user picks from, never configuration written behind them.
+ * catalog, so a row is only ever added deliberately. Each row carries an image
+ * input switch that writes the model's `input` modalities. Fetching asks the
+ * endpoint **the form currently shows** — including a key typed but not yet
+ * saved — so adding a provider is one pass instead of save-then-return; the
+ * reply is candidates the user picks from, never configuration written behind
+ * them.
  *
  * A provider that cannot be interrogated (an unreachable endpoint, a protocol
  * with no readable listing) is not a dead end: the failure is shown next to the
@@ -42,6 +44,36 @@ function textOf(model: ModelDraft, key: string): string {
 function numberOf(model: ModelDraft, key: string): number | undefined {
   const value = model[key]
   return typeof value === 'number' ? value : undefined
+}
+
+/** One editable model-row field this card writes. */
+type ModelFieldValue = string | number | readonly string[] | undefined
+
+/**
+ * Read a row's declared request modalities.
+ * Absent or empty means "no answer here" and the adapter falls through.
+ */
+function declaredInput(model: ModelDraft): string[] | undefined {
+  const value = model['input']
+  if (!Array.isArray(value) || value.length === 0) return undefined
+  if (!value.every(item => typeof item === 'string')) return undefined
+  return [...value]
+}
+
+/** Whether this row currently declares native image input. */
+function declaresImageInput(model: ModelDraft): boolean {
+  return declaredInput(model)?.includes('image') === true
+}
+
+/**
+ * Apply the image-input switch without dropping other declared modalities.
+ * Off writes an explicit text-only list so a route-level default cannot
+ * silently re-enable images.
+ */
+function withImageInput(current: readonly string[] | undefined, enabled: boolean): readonly string[] {
+  const kept = (current ?? ['text']).filter(item => item !== 'image')
+  const base = kept.length === 0 ? ['text'] : kept
+  return enabled ? [...base, 'image'] : base
 }
 
 /** What an interrogation needs, taken from the live form. */
@@ -210,7 +242,7 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
     })
   }
 
-  const patch = (index: number, next: Record<string, string | number | undefined>): void => {
+  const patch = (index: number, next: Record<string, ModelFieldValue>): void => {
     onChange(models.map((model, at) => {
       if (at !== index) return model
       // Rebuilt rather than spread over: an emptied optional field has to leave
@@ -333,7 +365,7 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
       {models.length === 0 ? <p className={styles['modelEmpty']}>{t('modelsEmpty')}</p> : null}
       {models.map((model, index) => (
         <div key={index} className={styles['modelEntry']}>
-          <div className={styles['modelRow']}>
+          <div className={`${styles['modelRow']} ${styles['modelRowWithImage']}`}>
             <input
               className={styles['input']}
               type="text"
@@ -352,6 +384,21 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
               disabled={disabled}
               onChange={(event) => { patch(index, { name: event.target.value === '' ? undefined : event.target.value }) }}
             />
+            <label
+              className={styles['modelImageToggle']}
+              title={t('modelImageInputHint')}
+            >
+              <input
+                type="checkbox"
+                checked={declaresImageInput(model)}
+                disabled={disabled}
+                aria-label={`${t('modelImageInput')} ${index + 1}`}
+                onChange={(event) => {
+                  patch(index, { input: withImageInput(declaredInput(model), event.currentTarget.checked) })
+                }}
+              />
+              <span>{t('modelImageInput')}</span>
+            </label>
             <button
               type="button"
               className={styles['iconButton']}

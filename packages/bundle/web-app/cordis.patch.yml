@@ -162,8 +162,16 @@
         # its literals, for example: ['app.internal', ...ctx.webRuntime.trustedHosts].
         trustedHosts: !!js ctx.webRuntime.trustedHosts
 
+    # Host broker for approved tab operations. The browser-side provider below
+    # registers only after the MV3 content script answers its protocol probe.
+    - id: browser
+      name: '@deepseek-ai/dsh-browser'
+
     - id: api-remotes
       name: '@deepseek-ai/dsh-api-remotes'
+
+    - id: browser-extension
+      name: '@deepseek-ai/dsh-client-browser-extension'
 
     - id: client-runtime
       name: '@deepseek-ai/dsh-client-runtime'
@@ -266,6 +274,10 @@
     # Plan control: the composer plan seat over the plan projection + /plan channel.
     - id: ui-plan
       name: '@deepseek-ai/dsh-client-ui-plan'
+
+    # Web networking control: composer left-row globe over webNetworking + /web.
+    - id: ui-web
+      name: '@deepseek-ai/dsh-client-ui-web'
 
     - id: ui-user-questions
       name: '@deepseek-ai/dsh-client-ui-user-questions'

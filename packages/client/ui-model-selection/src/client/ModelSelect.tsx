@@ -23,6 +23,7 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ModelSelectInjected } from './slots.ts'
+import { compactModelLabel } from './compactModelLabel.ts'
 import css from './ModelSelect.module.css'
 
 /** Which pane the dropdown shows: the two-row root or one drilled-in list. */
@@ -237,6 +238,7 @@ export function ModelSelect(
         }}
       >
         <span className={css.triggerLabel}>{modelLabel}</span>
+        <span className={css.triggerLabelCompact} aria-hidden="true">{compactModelLabel(modelLabel)}</span>
         {effortLabel !== undefined && <span className={css.triggerEffort}>{effortLabel}</span>}
         <IconChevronDownOutline14 className={clsx(css.chevron, open && css.chevronOpen)} />
       </button>

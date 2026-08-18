@@ -488,6 +488,22 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Search and fetch providers register into one ctx.web seam; tool-web owns the stable model-facing names.',
   },
   {
+    key: 'browser',
+    pkg: 'browser',
+    title: 'Browser tab provider broker',
+    mode: 'seam',
+    implementations: ['client-browser-extension'],
+    consumers: ['tool-browser'],
+    note: 'The Host owns leased provider selection and request lifecycle; the Web Client extension provider owns Chromium access, and tool-browser owns model-facing schemas and results.',
+  },
+  {
+    key: 'webNetworking',
+    pkg: 'web-networking',
+    title: 'Per-session web tool availability',
+    mode: 'core',
+    note: 'Folds the durable /web preference and applies the corresponding live tool restriction to each agent.',
+  },
+  {
     key: 'spillStore',
     pkg: 'spill',
     title: 'Spill storage seam',

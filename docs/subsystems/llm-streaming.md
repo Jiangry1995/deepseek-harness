@@ -495,7 +495,7 @@ interface GenerateOptions {
    * map the purpose to model-hidden transport metadata or purpose-specific
    * generation policy. Ordinary conversation requests leave it unset.
    */
-  purpose?: 'compaction' | 'session-title'
+  purpose?: 'compaction' | 'session-title' | 'image-transcription'
 }
 ```
 
@@ -628,6 +628,8 @@ interface LlmCallConfigAdapterDefaults {
 
 `LlmAdapter` is the provider contract: subclass, implement `stream()`, and register one adapter instance with `ctx.llm.registerAdapter(providers, adapter)`. `GenerateOptions.provider` selects the registered adapter; `GenerateOptions.model` is passed to that adapter and need not be registered at lifecycle start. Duplicate provider routes fail atomically. Optional `providerRetryPolicy()` is captured per route with normal defaults, while `providerInfo()` and asynchronous `listModels()` feed `LlmRuntime.listProviders()` / `listModels()` with detached selector metadata. That catalog is advisory rather than a request whitelist: the adapter remains authoritative and may accept unlisted model ids. One asynchronous `resolveModel()` query returns exact model identity plus optional correctness-sensitive context capacity, an adapter-configured `defaultMaxTokens`, and ordered model-owned reasoning ids with an optional deployment default; absent fields mean unavailable metadata or provider-owned behavior, not invalid catalog membership. The resolver receives optional cancellation and must settle promptly after abort. `LlmRuntime.resolveModelInfo()` validates and detaches the aggregate. At the final adapter boundary, `resolveCallConfig()` materializes the output default only when `maxTokens` is absent and validates and materializes reasoning, so direct calls cannot bypass either configured behavior; direct dispatch captures one registration before awaiting that resolution. The agent loop instead uses `prepareCall()` to keep the same registration across model resolution, durable header logging, and dispatch, retain detached context metadata from that exact lookup, and report which config fields the adapter defaulted. Adapter lookup happens at the terminal continuation of the `llm/stream` waterfall, so a listener may short-circuit the call or route a mutable one-shot request before lookup. AgentLoop observes a request attempt once the outer waterfall returns a stream handle; that limited boundary does not prove a lazy terminal adapter was constructed or began provider I/O. The `block-start` / `block-end` `index` correlation and the assembler together mean an adapter only has to emit well-formed chunks — block reassembly is not each adapter's problem. [architecture.md](../architecture.md#turn-flow) shows where `ctx.llm.stream()` and the `llm/stream` waterfall sit in one turn.
 
+`LlmRuntime.registerImageFallback()` owns one optional process-wide image-to-text provider. `resolveImageInput()` preserves four exact-model states: `native` when `image` is declared, `fallback` when image is explicitly excluded and the provider is ready, `unsupported` when it is excluded with no ready provider, and `unknown` when modality metadata is absent. At the final adapter boundary, only an image-bearing request in the `fallback` state is projected; native and unknown routes retain their original blocks. The provider records its auxiliary input and exact replacement text in the same session before returning text-only messages, keeping the adapter request reconstructable from the durable log.
+
 ```ts type-equiv
 /** One model call whose config and adapter registration were resolved together. */
 interface PreparedLlmCall {
@@ -735,6 +737,24 @@ registerAdapter(providers: string[], adapter: LlmAdapter): AdapterRegistrationHa
 listProviders(): LlmProviderInfo[]
 
 /**
+ * Register the process's sole automatic image-to-text fallback. The
+ * registration is released with its Cordis fiber.
+ * @param fallback - provider that logs and projects image-bearing requests.
+ * @returns disposer that removes this exact provider.
+ */
+registerImageFallback(fallback: LlmImageFallback): () => void
+
+/**
+ * Resolve whether one exact route handles images natively, through the
+ * installed fallback, not at all, or with unknown capability.
+ * @param provider - registered provider route.
+ * @param model - exact model id on the route.
+ * @param signal - cancellation for model and fallback availability lookup.
+ * @returns the current image-input resolution.
+ */
+async resolveImageInput( provider: string, model: string, signal?: AbortSignal, ): Promise<ImageInputResolution>
+
+/**
  * Declare provider routes an adapter plugin can activate through
  * configuration. Registration is all-or-nothing: an empty list, invalid
  * entry, or a provider already declared by any registration throws
@@ -835,7 +855,7 @@ async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<Prepared
 stream(options: GenerateOptions): AsyncIterable<StreamChunk>
 ```
 
-Source: [`packages/llm/llm/src/index.ts:284`](../../packages/llm/llm/src/index.ts)
+Source: [`packages/llm/llm/src/index.ts:313`](../../packages/llm/llm/src/index.ts)
 
 <a id="llm-events"></a>
 
@@ -884,5 +904,5 @@ Waterfall around every streaming model call (retry, replay, routing). Bound to t
 'llm/stream'(this: LlmRuntime, options: GenerateOptions, next: () => AsyncIterable<StreamChunk>): AsyncIterable<StreamChunk>
 ```
 
-Source: [`packages/llm/llm/src/index.ts:64`](../../packages/llm/llm/src/index.ts)
+Source: [`packages/llm/llm/src/index.ts:65`](../../packages/llm/llm/src/index.ts)
 <!-- END GENERATED cordis-surface -->

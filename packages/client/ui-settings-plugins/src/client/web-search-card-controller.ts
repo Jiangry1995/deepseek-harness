@@ -170,12 +170,13 @@ export class WebSearchCardController {
    * @returns whether the Host reports a configured credential afterwards.
    */
   private async writeKey(value: string): Promise<boolean> {
+    let response: Awaited<ReturnType<IApiClient['credentials']['set']>>
     try {
-      await this.api.credentials.set({ ref: refOf(this.scope.getSnapshot()), value })
+      response = await this.api.credentials.set({ ref: refOf(this.scope.getSnapshot()), value })
     } catch (_credentialWriteFailure) {
-      // Refusals surface through the re-read below: the Host is the only
-      // authority on whether the key now exists.
+      return false
     }
+    if (!response.result.ok) return false
     await this.readCredential()
     return this.credential.configured
   }

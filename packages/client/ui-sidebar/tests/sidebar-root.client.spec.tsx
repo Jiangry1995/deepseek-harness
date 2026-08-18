@@ -117,3 +117,103 @@ describe('SidebarRoot shell', () => {
     expect(screen.getByRole('button', { name: 'Open sidebar' })).toBeTruthy()
   })
 })
+
+describe('SidebarRoot side-panel shell', () => {
+  function sessionsHook(current: string | undefined = 's-1') {
+    return ((sel: (s: { current: string | undefined }) => unknown) => sel({ current })) as SidebarRootComponentProps['useSessions']
+  }
+
+  function mountSidePanel(options: { useSessions?: SidebarRootComponentProps['useSessions'] } = {}) {
+    const startSession = vi.fn()
+    const toggleSidebar = vi.fn()
+    const useSessions = options.useSessions ?? sessionsHook()
+    const view = render(
+      <SidebarRoot
+        collapsed={false}
+        width={0}
+        surface="side-panel"
+        useSessions={useSessions}
+        useWorkspaces={neverHook}
+        startSession={startSession}
+        toggleSidebar={toggleSidebar}
+        t={t}
+        renderSlot={((
+          key: string,
+          owner: SidebarFooterActionOwnerProps | SidebarSectionOwnerProps | SidebarSettingsOwnerProps,
+        ) => {
+          if (key === 'sidebar.settings') {
+            return <button type="button" data-testid="settings-seat" data-wide={String(owner.wide)}>Settings</button>
+          }
+          if (key === 'sidebar.footer.action') {
+            return <div data-testid="footer-action-seat" data-wide={String(owner.wide)} />
+          }
+          return <div data-testid="region" data-wide={String(owner.wide)} />
+        }) as SidebarRootComponentProps['renderSlot']}
+      />,
+    )
+    return { startSession, toggleSidebar, ...view }
+  }
+
+  it('renders chrome actions and hides the desktop rail', () => {
+    mountSidePanel()
+    expect(screen.getByRole('button', { name: 'Chats and workspaces' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'New session' })).toBeTruthy()
+    expect(screen.getByTestId('settings-seat').getAttribute('data-wide')).toBe('false')
+    expect(screen.queryByRole('button', { name: 'Open sidebar' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Collapse sidebar' })).toBeNull()
+    expect(screen.queryByRole('navigation', { name: 'Chats and workspaces' })).toBeNull()
+  })
+
+  it('packs new-session and settings in one end cluster', () => {
+    const view = mountSidePanel()
+    const cluster = view.container.querySelector('[data-chrome-end]')
+    expect(cluster).toBeTruthy()
+    expect(cluster?.contains(screen.getByRole('button', { name: 'New session' }))).toBe(true)
+    expect(cluster?.contains(screen.getByTestId('settings-seat'))).toBe(true)
+  })
+
+  it('opens the history drawer with a wide workspace browser', () => {
+    mountSidePanel()
+    fireEvent.click(screen.getByRole('button', { name: 'Chats and workspaces' }))
+    expect(screen.getByRole('navigation', { name: 'Chats and workspaces' })).toBeTruthy()
+    expect(screen.getByTestId('region').getAttribute('data-wide')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Close' }).getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('starts a session from chrome and closes the drawer', () => {
+    const b = mountSidePanel()
+    fireEvent.click(screen.getByRole('button', { name: 'Chats and workspaces' }))
+    fireEvent.click(screen.getByRole('button', { name: 'New session' }))
+    expect(b.startSession).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('navigation', { name: 'Chats and workspaces' })).toBeNull()
+  })
+
+  it('closes the drawer when the current session changes', () => {
+    let current: string | undefined = 's-1'
+    const useSessions = ((sel: (s: { current: string | undefined }) => unknown) => sel({ current })) as SidebarRootComponentProps['useSessions']
+    const view = mountSidePanel({ useSessions })
+    fireEvent.click(screen.getByRole('button', { name: 'Chats and workspaces' }))
+    expect(screen.getByRole('navigation', { name: 'Chats and workspaces' })).toBeTruthy()
+    current = 's-2'
+    view.rerender(
+      <SidebarRoot
+        collapsed={false}
+        width={0}
+        surface="side-panel"
+        useSessions={useSessions}
+        useWorkspaces={neverHook}
+        startSession={view.startSession}
+        toggleSidebar={view.toggleSidebar}
+        t={t}
+        renderSlot={((
+          key: string,
+        ) => {
+          if (key === 'sidebar.settings') return <button type="button">Settings</button>
+          if (key === 'sidebar.footer.action') return <div />
+          return <div data-testid="region" />
+        }) as SidebarRootComponentProps['renderSlot']}
+      />,
+    )
+    expect(screen.queryByRole('navigation', { name: 'Chats and workspaces' })).toBeNull()
+  })
+})

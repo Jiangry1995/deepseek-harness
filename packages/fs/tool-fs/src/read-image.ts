@@ -56,7 +56,7 @@ export function imageMediaTypeForPath(filePath: string): ImageMediaType | undefi
 /**
  * Enforce the strict image-capability gate for the calling route. Resolves the
  * session's latest routed provider/model (request header config, then agent
- * options) and requires the exact resolved route to declare `image` input explicitly.
+ * options) and requires native image input or a confirmed automatic fallback.
  * @param ctx - the plugin context used to resolve the optional `llm` service.
  * @param exec - the tool-execution context supplying the calling agent.
  * @param requestedPath - the raw, not-yet-resolved path rendered in refusal messages.
@@ -69,9 +69,9 @@ export async function assertImageCapableRoute(ctx: Context, exec: ToolExecution,
   if (provider === undefined || model === undefined || llm === undefined) {
     throw new Error(`cannot read "${requestedPath}" as an image: the current model route could not be resolved`)
   }
-  const active = await llm.resolveModelInfo(provider, model, exec.signal)
-  if (active.inputModalities === undefined || !active.inputModalities.includes('image')) {
-    throw new Error(`cannot read "${requestedPath}" as an image: model "${model}" does not declare image input; switch to an image-capable model to read images`)
+  const imageInput = await llm.resolveImageInput(provider, model, exec.signal)
+  if (imageInput.kind !== 'native' && imageInput.kind !== 'fallback') {
+    throw new Error(`cannot read "${requestedPath}" as an image: model "${model}" does not declare image input and no automatic image fallback is available; switch to an image-capable model or configure automatic vision`)
   }
 }
 
@@ -130,7 +130,7 @@ function imageReadContent(value: ImageReadValue): ContentBlock[] {
 export function applyReadImageTool(ctx: Context): void {
   ctx.tools.register(defineTool({
     name: 'read_image',
-    description: 'Read a PNG/JPEG/WebP/GIF file and return the image itself. Requires the current model to accept image input.',
+    description: 'Read a PNG/JPEG/WebP/GIF file and return the image itself. Requires native image input or a configured automatic vision fallback.',
     parameters: {
       file_path: { type: 'string', required: true, description: 'Path to the image file, resolved by the filesystem backend.' },
     },

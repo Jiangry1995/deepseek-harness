@@ -1,0 +1,159 @@
+/* Side-panel chrome: a top bar over the conversation plus a full-size
+   history drawer. The layout column is pointer-events:none; chrome and
+   drawer opt back in. No left rail, no extra card borders. */
+
+.shell {
+  /* Viewport-fixed so a 0-width grid cell does not clip the chrome. The
+     sidebar column itself stays in-flow (see AppFrame side-panel CSS). */
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  pointer-events: none;
+  background: transparent;
+}
+
+.drawer {
+  pointer-events: auto;
+}
+
+/* Overlay only: the session header paints the bar and the title. Clicks pass
+   through the empty middle so tabs and utilities remain usable. */
+.chrome {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--dsh-side-panel-chrome-gap, 4px);
+  height: var(--dsh-side-panel-chrome-height, 48px);
+  padding: 0 var(--dsh-side-panel-chrome-pad, 8px);
+  box-sizing: border-box;
+  pointer-events: none;
+  background: transparent;
+  border-bottom: none;
+}
+
+.iconButton,
+.chromeSettings {
+  pointer-events: auto;
+}
+
+/* History drawer covers the conversation; the chrome must own the bar again
+   so its title does not collide with the session header underneath. */
+.shell:has(.drawer:not([hidden])) .chrome {
+  pointer-events: auto;
+  background: var(--dsw-alias-bg-base);
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+.chromeTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 22px;
+  color: var(--dsw-alias-label-primary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.chromeSpacer {
+  flex: 1;
+  min-width: 0;
+}
+
+.chromeEnd {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--dsh-side-panel-chrome-gap, 4px);
+  pointer-events: auto;
+}
+
+.iconButton {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--dsh-side-panel-chrome-icon, 20px);
+  height: var(--dsh-side-panel-chrome-icon, 20px);
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+}
+
+.iconButton svg {
+  width: 16px;
+  height: 16px;
+}
+
+.iconButton:hover,
+.iconButton[aria-expanded='true'] {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.chromeSettings {
+  flex: none;
+  width: var(--dsh-side-panel-chrome-icon, 20px);
+  height: var(--dsh-side-panel-chrome-icon, 20px);
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Beat SettingsRoot `.trigger.rail` (36px circle + vertical margin). */
+.shell .chromeEnd .chromeSettings > :global(button) {
+  width: var(--dsh-side-panel-chrome-icon, 20px);
+  height: var(--dsh-side-panel-chrome-icon, 20px);
+  margin: 0;
+  padding: 0;
+  border-radius: 6px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.shell .chromeEnd .chromeSettings :global(svg) {
+  width: 16px;
+  height: 16px;
+}
+
+.drawer {
+  position: absolute;
+  top: var(--dsh-side-panel-chrome-height, 48px);
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--dsw-specific-sidebar-fill);
+}
+
+.drawer[hidden] {
+  display: none;
+}
+
+.regionArea {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.footArea {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.footerActions {
+  flex: none;
+  min-width: 0;
+  width: 100%;
+  display: flex;
+}

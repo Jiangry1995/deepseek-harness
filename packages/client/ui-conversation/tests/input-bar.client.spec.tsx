@@ -1151,6 +1151,15 @@ describe('strips and variants', () => {
     expect(view.getByTestId('li')).toBeTruthy()
     expect(view.getByTestId('ri')).toBeTruthy()
   })
+
+  it('wraps model and right extras so the side-panel sheet can collapse the toolbar', () => {
+    const { view } = bench({
+      rightItems: <i data-testid="ri" />,
+      modelEntry: <button type="button">Model</button>,
+    })
+    expect(view.getByTestId('ri').parentElement?.className).toMatch(/trailingExtras/)
+    expect(view.getByRole('button', { name: 'Model' }).parentElement?.className).toMatch(/modelSeat/)
+  })
 })
 
 describe('command launcher chrome and control seats', () => {

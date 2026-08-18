@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { EventEmitter } from 'node:events'
+import { readFile } from 'node:fs/promises'
 import { LogBuffer, makeBindingErrorClasses, makeConsoleShim, makeNamespaces, captureStreamWrites, prepareCompletion, prepareException, runWorkerMain, wireReplies } from '../src/bootstrap.ts'
 import type { BootstrapPort, PatchableStream, PendingCall } from '../src/bootstrap.ts'
 import type { ReplyMessage, WorkerToHost } from '../src/protocol.ts'
@@ -260,6 +261,27 @@ describe('makeNamespaces', () => {
     expect(pending.size).toBe(0)
   })
 
+  it('treats a missing or undefined argument as an empty object', async () => {
+    const port = new FakePort()
+    port.respond = message => message.type === 'call'
+      ? { type: 'reply', id: message.id, ok: true, value: encodeWorkerJson({ ok: true }) }
+      : undefined
+    const pending = new Map<number, PendingCall>()
+    wireReplies(port, pending)
+    const [tools] = makeNamespaces(
+      { namespaces: [toolNamespace(['read'])] }, port, pending, { value: 1 },
+    ) as [Record<string, (args?: unknown) => Promise<unknown>>]
+
+    await expect(tools.read?.()).resolves.toEqual({ ok: true })
+    await expect(tools.read?.(undefined)).resolves.toEqual({ ok: true })
+    const posted = port.sent.filter(message => message.type === 'call')
+    expect(posted).toHaveLength(2)
+    for (const message of posted) {
+      if (message.type !== 'call') continue
+      expect(decodeWorkerJson(message.args)).toEqual({})
+    }
+  })
+
   it('rejects lossy arguments before posting or allocating a call id', async () => {
     let posts = 0
     const port: BootstrapPort = { postMessage: () => { posts += 1 }, on: () => {} }
@@ -308,6 +330,12 @@ describe('makeNamespaces', () => {
     const cloneFailure = await rejectionOf(cloneHelpers.x?.({}) ?? Promise.resolve())
     expect(cloneFailure).toBeInstanceOf(Error)
     expect(cloneFailure).not.toHaveProperty('toolName')
+  })
+
+  it('ships worker.cjs that treats omitted binding arguments as empty objects', async () => {
+    const worker = await readFile(new URL('../lib/worker.cjs', import.meta.url), 'utf8')
+    expect(worker).toContain('function normalizeBindingArgs')
+    expect(worker).toMatch(/args === (?:undefined|void 0) \? \{\}/)
   })
 })
 

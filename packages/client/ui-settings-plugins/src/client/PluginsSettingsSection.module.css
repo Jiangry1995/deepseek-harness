@@ -26,10 +26,12 @@
   gap: 22px;
   border-bottom: 1px solid var(--dsw-alias-border-l2);
   margin-top: 2px;
+  overflow-x: auto;
 }
 
 .tab {
   position: relative;
+  flex: none;
   border: 0;
   padding: 7px 1px 9px;
   background: transparent;
@@ -37,6 +39,7 @@
   font: inherit;
   font-size: 13px;
   line-height: 20px;
+  white-space: nowrap;
   cursor: pointer;
 }
 

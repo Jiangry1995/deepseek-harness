@@ -3,7 +3,9 @@
 import { describe, expect, it } from 'vitest'
 import type { AssistantMessageNode, ConversationNode, UserMessageNode } from '@deepseek-ai/dsh-client-runtime/client'
 import { assistantStepReading, deriveTurnMetrics } from '../src/client/chat/turn-metrics.ts'
-import { formatLatencySeconds, formatTokensPerSecond } from '../src/client/chat/message-chrome.ts'
+import { formatLatencySeconds, formatTimingLabel, formatTokensPerSecond } from '../src/client/chat/message-chrome.ts'
+import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
+import { zh } from '../src/client/locales.ts'
 
 interface StepSpec {
   seq: number
@@ -150,5 +152,20 @@ describe('footer figure formatters', () => {
     expect(formatTokensPerSecond(9.96)).toBe('10')
     expect(formatTokensPerSecond(3.14)).toBe('3.1')
     expect(formatTokensPerSecond(-1)).toBe('0')
+  })
+})
+
+describe('formatTimingLabel', () => {
+  const t = makeTranslate(zh)
+  const now = new Date(2026, 7, 18, 10, 0).getTime()
+
+  it('joins clock and turn readings with a middle dot', () => {
+    const time = new Date(2026, 7, 17, 17, 25).getTime()
+    expect(formatTimingLabel(
+      time,
+      { runMs: 8_000, ttftMs: 1_100, tokensPerSecond: 142 },
+      t,
+      now,
+    )).toBe('8月17日 17:25 · 用时 8秒 · 首 token 1.1秒 · 142 tok/s')
   })
 })

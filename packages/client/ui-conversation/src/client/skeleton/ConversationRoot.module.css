@@ -53,6 +53,7 @@
 .titleRow {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0;
   min-height: 32px;
 }
@@ -132,11 +133,18 @@
   display: none;
 }
 
+/* Desktop: dissolve so utilities stay on the title row and tabs wrap below.
+   Plugin chrome restyles this into a light card. */
+.viewSwitch {
+  display: contents;
+}
+
 /* figma Tab_Group 34:11441: 35px strip, gap 36, pad-left 8, tabs bottom-aligned. */
 .tabs {
   position: relative;
   z-index: 1;
   display: flex;
+  flex: 1 0 100%;
   gap: 36px;
   margin-top: 4px;
   padding-left: 8px;
@@ -222,6 +230,125 @@
   flex: none;
 }
 
+/* Plugin side-panel: one 48px row shared with SidePanelShell overlay icons.
+   Title + 对话/轨迹 sit in the hole between 历史 and 新建/设置. Desktop
+   header (two-row figma chrome) is unchanged. */
+:global([data-surface='side-panel']) .header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--dsh-side-panel-chrome-gap, 4px);
+  box-sizing: border-box;
+  height: var(--dsh-side-panel-chrome-height, 48px);
+  min-height: var(--dsh-side-panel-chrome-height, 48px);
+  padding: 0 var(--dsh-side-panel-chrome-end, 56px) 0 var(--dsh-side-panel-chrome-start, 32px);
+}
+
+/* Hero/blank: keep the band so the overlay icons still sit on a bar, rather
+   than floating over the empty-state copy. */
+:global([data-surface='side-panel']) .headerHidden {
+  display: block;
+  overflow: hidden;
+}
+
+:global([data-surface='side-panel']) .titleRow {
+  flex: 1;
+  flex-wrap: nowrap;
+  min-width: 0;
+  min-height: 0;
+  gap: var(--dsh-side-panel-chrome-gap, 4px);
+}
+
+:global([data-surface='side-panel']) .titleCluster {
+  gap: var(--dsh-side-panel-chrome-gap, 4px);
+}
+
+/* Title absorbs leftover width so share / export / 对话 stay packed with 新建 / 设置. */
+:global([data-surface='side-panel']) .crumbs {
+  flex: 1;
+  min-width: 0;
+}
+
+:global([data-surface='side-panel']) .headerActions:empty {
+  display: none;
+}
+
+/* Share / download match 新建 / 设置: 16px glyph, primary ink. */
+:global([data-surface='side-panel']) .headerActions,
+:global([data-surface='side-panel']) .headerUtilities {
+  height: var(--dsh-side-panel-chrome-icon, 20px);
+  color: var(--dsw-alias-label-primary);
+}
+
+:global([data-surface='side-panel']) .headerActions svg,
+:global([data-surface='side-panel']) .headerUtilities svg {
+  width: 16px;
+  height: 16px;
+  opacity: 1;
+}
+
+:global([data-surface='side-panel']) .crumb {
+  max-width: none;
+  padding: 2px 0;
+}
+
+:global([data-surface='side-panel']) .crumbCurrent {
+  font-weight: 600;
+}
+
+:global([data-surface='side-panel']) .viewSwitch {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  box-sizing: border-box;
+  height: 24px;
+  margin-inline: var(--dsh-side-panel-chrome-gap, 4px);
+  padding: 2px 4px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 4%, var(--dsw-alias-bg-base));
+}
+
+:global([data-surface='side-panel']) .headerUtilities {
+  margin-left: 0;
+  gap: 0;
+}
+
+:global([data-surface='side-panel']) .tabs {
+  flex: none;
+  gap: 2px;
+  margin-top: 0;
+  padding-left: 0;
+}
+
+/* Compact switcher: selected is a full-height inner tile, not a capsule
+   hugging the label. */
+:global([data-surface='side-panel']) .tab {
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-secondary);
+}
+
+:global([data-surface='side-panel']) .tab::after {
+  display: none;
+}
+
+:global([data-surface='side-panel']) .tab:hover {
+  color: var(--dsw-alias-label-primary);
+  background: transparent;
+}
+
+:global([data-surface='side-panel']) .tabActive {
+  font-weight: 650;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-base);
+}
+
 .scrollBody {
   display: flex;
   flex: 1;
@@ -236,11 +363,12 @@
      than the glow. Clipping is unchanged — `overflow-y: auto` already made this
      a scroll container that clips both axes, so this only takes away the bar. */
   overflow-x: hidden;
-  /* Reserved unconditionally: the composer seat rides this box's content box in
-     Chat and its padding box under a view's composer overlay, so an `auto`
-     gutter moves the input card sideways by the bar's width whenever the two
-     differ ([decision](../../../../../../.agents/notes/implemented/bug-fix/2026-08-04-composer-tab-gutter-reservation.md)). */
-  scrollbar-gutter: stable;
+  /* Reserved unconditionally on desktop: the composer seat rides this box's
+     content box in Chat, so an `auto` gutter moves the input card sideways
+     by the bar's width whenever overflow appears. The side-panel iframe has
+     no room for a phantom 8–17px strip — it would look off-center — so the
+     frame sets --dsh-conversation-scrollbar-gutter: auto. */
+  scrollbar-gutter: var(--dsh-conversation-scrollbar-gutter, stable);
 }
 
 .root[data-phase='active'] .viewArea {

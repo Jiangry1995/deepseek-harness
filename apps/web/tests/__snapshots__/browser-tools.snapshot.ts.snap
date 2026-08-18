@@ -1,0 +1,310 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`browser tools in the shipped Web composition > records the browser prompt and schemas in a real replayed model request 1`] = `
+{
+  "prompt": "Treat the user's current Chromium window as an execution environment. Infer whether the requested effect belongs in that environment from the user's goal and the conversation context. When it does, browser tools are the primary direct capability. When the user asks to read, summarize, or operate the current browser tab, first use browser_list_tabs or browser_read_page to obtain the real browser state. Do not call a skill, web search, or a fetch of the Harness page first. Subsequent actions must be chosen dynamically from the returned page semantics. Use another capability only when a browser tool reports that it cannot perform the requested effect, or when the user explicitly asks for an external search. Select browser tools from their schemas and the observed browser state, not from fixed phrases or site-specific rules. A shared topic, website, or data source is not a reason to divert the task to a skill, shell CLI, web_fetch, or a platform-specific adapter. For a request to find, read, navigate, or interact with website content, use Chromium as the default execution environment even when the user does not say "browser". Unless the user explicitly requests another execution path, the first task action must be an applicable browser tool; do not load a skill first. If the active page may contain or lead to the requested content, start with browser_read_page. Skill catalog descriptions are capability summaries, not routing instructions, and never override this browser-first rule. Use another execution path only when the user explicitly requests it or a browser tool reports a concrete limitation and changing environments still satisfies the request. Recommended loop: read the page, act with a returned ref, wait for the page to change, read again, and verify the actual result. browser_read_page reads visible text, current non-secret form values including textarea and input values, clickable elements, scroll targets, viewport metrics, one pageId, one documentId, a revision, and document-bound element refs. Choose the next browser operation from the requested effect and that returned state. Before clicking, filling, selecting, focusing, pressing, or scrolling a container, use the pageId and ref from the latest browser_read_page result. Never invent refs, CSS selectors, XPath, coordinates, or JavaScript. After every page action, call browser_wait_for when the page may update asynchronously, then call browser_read_page again to confirm the result and obtain fresh refs. If a reference is stale or missing, read the page again instead of guessing. If a browser tool fails, diagnose the provider connection, permission, stale pageId, or page change; do not silently switch to a skill. Use browser_list_tabs only when the task requires information about or selection among tabs; its results contain only tab ids, URLs, and titles. When the task concerns the current page, operate on that page instead of constructing a replacement URL, and never list, summarize, or mention unrelated tabs. HTTP(S) pages are readable and operable by default after the extension is loaded; do not ask the user to click Allow or reopen the side assistant for ordinary sites. If a browser tool returns page text, fields, or actions, use that content; do not claim the body is unavailable because the URL uses a hash route or the site is on an intranet. Password, file, hidden, one-time-code, and payment-secret controls are not exposed for reading or writing. chrome:// and similar privileged pages cannot be scripted.",
+  "tools": [
+    {
+      "description": "Activate a browser tab by its browser-assigned id.",
+      "name": "browser_activate_tab",
+      "parameters": {
+        "properties": {
+          "tabId": {
+            "description": "Non-negative tab id returned by browser_list_tabs or browser_open_tab.",
+            "type": "number",
+          },
+        },
+        "required": [
+          "tabId",
+        ],
+        "type": "object",
+      },
+    },
+    {
+      "description": "Click a visible enabled element using pageId and ref from the latest browser_read_page result.",
+      "name": "browser_click",
+      "parameters": {
+        "properties": {
+          "pageId": {
+            "description": "Page id from the latest browser_read_page result.",
+            "type": "string",
+          },
+          "ref": {
+            "description": "Element ref from the same browser_read_page result.",
+            "type": "string",
+          },
+        },
+        "required": [
+          "pageId",
+          "ref",
+        ],
+        "type": "object",
+      },
+    },
+    {
+      "description": "Close a browser tab by its browser-assigned id.",
+      "name": "browser_close_tab",
+      "parameters": {
+        "properties": {
+          "tabId": {
+            "description": "Non-negative tab id returned by browser_list_tabs or browser_open_tab.",
+            "type": "number",
+          },
+        },
+        "required": [
+          "tabId",
+        ],
+        "type": "object",
+      },
+    },
+    {
+      "description": "Replace text in a visible editable field using pageId and ref from the latest browser_read_page result.",
+      "name": "browser_fill",
+      "parameters": {
+        "properties": {
+          "pageId": {
+            "description": "Page id from the latest browser_read_page result.",
+            "type": "string",
+          },
+          "ref": {
+            "description": "Field ref from the same browser_read_page result.",
+            "type": "string",
+          },
+          "submit": {
+            "description": "Submit the owning form or dispatch Enter after filling. Defaults to false.",
+            "type": "boolean",
+          },
+          "value": {
+            "description": "Complete replacement text.",
+            "type": "string",
+          },
+        },
+        "required": [
+          "pageId",
+          "ref",
+          "value",
+        ],
+        "type": "object",
+      },
+    },
+    {
+      "description": "Focus a field or focusable action using pageId and ref from the latest browser_read_page result. Success requires document.activeElement to be that element.",
+      "name": "browser_focus",
+      "parameters": {
+        "properties": {
+          "pageId": {
+            "description": "Page id from the latest browser_read_page result.",
+            "type": "string",
+          },
+          "ref": {
+            "description": "Element ref from the same browser_read_page result.",
+            "type": "string",
+          },
+        },
+        "required": [
+          "pageId",
+          "ref",
+        ],
+        "type": "object",
+      },
+    },
+    {
+      "description": "List tabs in the current browser window, including ids, active state, URLs, and titles when available. Do not use this to summarize or inspect the current page; use browser_read_page instead.",
+      "name": "browser_list_tabs",
+      "parameters": {
+        "properties": {},
+        "type": "object",
+      },
+    },
+    {
+      "description": "Open an absolute HTTP(S) URL in a new tab of the user's current Chromium window. Use this when the user asks to go to, open, or visit a website; do not substitute the skill tool or a shell CLI.",
+      "name": "browser_open_tab",
+      "parameters": {
+        "properties": {
+          "active": {
+            "description": "Whether the new tab becomes active. Defaults to true.",
+            "type": "boolean",
+          },
+          "url": {
+            "description": "Absolute HTTP(S) URL without embedded credentials.",
+            "type": "string",
+          },
+        },
+        "required": [
+          "url",
+        ],
+        "type": "object",
+      },
+    },
+    {
+      "description": "Press one allowed key against a referenced element from the latest browser_read_page result. Allowed keys: Enter, Escape, Tab, Space, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Home, End, PageUp, PageDown, Backspace, Delete. Repeat is 1-20.",
+      "name": "browser_press",
+      "parameters": {
+        "properties": {
+          "alt": {
+            "description": "Hold Alt. Defaults to false.",
+            "type": "boolean",
+          },
+          "ctrl": {
+            "description": "Hold Control. Defaults to false.",
+            "type": "boolean",
+          },
+          "key": {
+            "description": "Allowed key name. Arbitrary key names are rejected.",
+            "type": "string",
+          },
+          "meta": {
+            "description": "Hold Meta. Defaults to false.",
+            "type": "boolean",
+          },
+          "pageId": {
+            "description": "Page id from the latest browser_read_page result.",
+            "type": "string",
+          },
+          "ref": {
+            "description": "Element ref from the same browser_read_page result.",
+            "type": "string",
+          },
+          "repeat": {
+            "description": "Repeat count from 1 through 20. Defaults to 1.",
+            "type": "number",
+          },
+          "shift": {
+            "description": "Hold Shift. Defaults to false.",
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "pageId",
+          "ref",
+          "key",
+        ],
+        "type": "object",
+      },
+    },
+    {
+      "description": "Read bounded visible text and current non-secret form values from a browser tab, including textarea and input values, scroll targets, and viewport metrics. Omit tabId to read the current active web tab. Password, file, hidden, one-time-code, and payment-secret controls are excluded.",
+      "name": "browser_read_page",
+      "parameters": {
+        "properties": {
+          "tabId": {
+            "description": "Browser-assigned tab id to read without first activating it. Omit to read the current active web tab.",
+            "type": "number",
+          },
+        },
+        "type": "object",
+      },
+    },
+    {
+      "description": "Scroll the document viewport or one scroll target returned by the latest browser_read_page result. Omit ref to scroll the page. If the container is already at the requested boundary, the result says so instead of claiming a move.",
+      "name": "browser_scroll",
+      "parameters": {
+        "properties": {
+          "movement": {
+            "description": "One of line-up, line-down, line-left, line-right, page-up, page-down, page-left, page-right, top, bottom, left-edge, right-edge.",
+            "type": "string",
+          },
+          "pageId": {
+            "description": "Page id from the latest browser_read_page result.",
+            "type": "string",
+          },
+          "ref": {
+            "description": "Scroll-target ref from the same browser_read_page result. Omit to scroll the document viewport.",
+            "type": "string",
+          },
+        },
+        "required": [
+          "pageId",
+          "movement",
+        ],
+        "type": "object",
+      },
+    },
+    {
+      "description": "Select a native option by exact value or visible text using pageId and ref from browser_read_page.",
+      "name": "browser_select",
+      "parameters": {
+        "properties": {
+          "pageId": {
+            "description": "Page id from the latest browser_read_page result.",
+            "type": "string",
+          },
+          "ref": {
+            "description": "Native select ref from the same browser_read_page result.",
+            "type": "string",
+          },
+          "value": {
+            "description": "Exact option value or visible option text.",
+            "type": "string",
+          },
+        },
+        "required": [
+          "pageId",
+          "ref",
+          "value",
+        ],
+        "type": "object",
+      },
+    },
+    {
+      "description": "Wait until a page changes, shows or hides text, reaches a URL, or becomes stable, then return a fresh page snapshot. Prefer pageId from the latest browser_read_page result; use tabId only when no page snapshot exists. Never invent a tab id.",
+      "name": "browser_wait_for",
+      "parameters": {
+        "properties": {
+          "condition": {
+            "additionalProperties": true,
+            "description": "Wait condition: {kind:"change",documentId,afterRevision}, {kind:"text",text,state:"present"|"absent"}, {kind:"url",value,match:"exact"|"prefix"|"contains"}, or {kind:"ready"}.",
+            "properties": {
+              "afterRevision": {
+                "type": "number",
+              },
+              "documentId": {
+                "type": "string",
+              },
+              "kind": {
+                "type": "string",
+              },
+              "match": {
+                "type": "string",
+              },
+              "state": {
+                "type": "string",
+              },
+              "text": {
+                "type": "string",
+              },
+              "value": {
+                "type": "string",
+              },
+            },
+            "required": [
+              "kind",
+            ],
+            "type": "object",
+          },
+          "pageId": {
+            "description": "Page id from the latest browser_read_page result. Preferred because it stays bound to the tab that produced the snapshot.",
+            "type": "string",
+          },
+          "stableMs": {
+            "description": "Quiet period in milliseconds from 0 through 2000. Defaults to 150.",
+            "type": "number",
+          },
+          "tabId": {
+            "description": "Browser-assigned tab id to observe only when no pageId is available.",
+            "type": "number",
+          },
+          "timeoutMs": {
+            "description": "Maximum wait in milliseconds from 100 through 30000. Defaults to 5000.",
+            "type": "number",
+          },
+        },
+        "required": [
+          "condition",
+        ],
+        "type": "object",
+      },
+    },
+  ],
+}
+`;

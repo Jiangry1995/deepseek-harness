@@ -1,6 +1,7 @@
 /** Platform-neutral assembly of generated Host Remote contributions. */
 
 import type { Context } from '@deepseek-ai/cordis'
+import browserRemote from '@deepseek-ai/dsh-browser/remote'
 import commandsRemote from '@deepseek-ai/dsh-commands/remote'
 import goalsRemote from '@deepseek-ai/dsh-goal/remote'
 import dynamicRemote from '@deepseek-ai/dsh-cordis-host-runner/remote'
@@ -10,6 +11,7 @@ import type { TypertClientRemote } from '@deepseek-ai/dsh-typert-protocol'
 
 export type { TypertClientRemote as ClientRemote } from '@deepseek-ai/dsh-typert-protocol'
 export type { PluginInventorySnapshot } from '@deepseek-ai/dsh-host-plugin-inventory/types'
+export type {} from '@deepseek-ai/dsh-browser/remote'
 export type {} from '@deepseek-ai/dsh-commands/remote'
 export type {} from '@deepseek-ai/dsh-goal/remote'
 export type {} from '@deepseek-ai/dsh-host-plugin-inventory/remote'
@@ -25,6 +27,7 @@ export type {} from '@deepseek-ai/dsh-cordis-host-runner/types'
 export type {} from '@deepseek-ai/dsh-credentials/types'
 export type {} from '@deepseek-ai/dsh-llm/types'
 export type {} from '@deepseek-ai/dsh-agent-presets/types'
+export type {} from '@deepseek-ai/dsh-browser/types'
 export type {} from '@deepseek-ai/dsh-settings/types'
 
 /**
@@ -85,6 +88,18 @@ export type {
 // The JSON vocabulary those payloads are built from, re-exported for the same
 // reason: a Client contribution names what it sends without importing a Host
 // package, and this assembly is where both planes legitimately meet.
+export type {
+  BrowserClientId,
+  BrowserClientLease,
+  BrowserCommand,
+  BrowserCompletion,
+  BrowserCompletionReceipt,
+  BrowserDisconnectReceipt,
+  BrowserOperation,
+  BrowserOperationResult,
+  BrowserRequestId,
+  BrowserTab,
+} from '@deepseek-ai/dsh-browser/types'
 export type { JsonValue } from '@deepseek-ai/dsh-session/types'
 
 declare module '@deepseek-ai/cordis' {
@@ -106,7 +121,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const disposers: Array<() => Promise<void>> = []
   try {
     for (const contribution of [
-      commandsRemote, goalsRemote, dynamicRemote, pluginInventoryRemote, messageFeedbackRemote,
+      browserRemote, commandsRemote, goalsRemote, dynamicRemote, pluginInventoryRemote, messageFeedbackRemote,
     ]) {
       disposers.push(await ctx.remote.$mount(contribution))
     }

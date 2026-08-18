@@ -323,6 +323,48 @@
   gap: 12px;
 }
 
+/* Wrappers stay `contents` on desktop so the flex row is unchanged. The
+   side-panel sheet turns them into real boxes to hide extras and let the
+   model trigger fill the remaining width. */
+.trailingExtras,
+.modelSeat,
+.meter {
+  display: contents;
+}
+
+/* Plugin composer: one unwrapped row — attach, model (ellipsis), send.
+   Permission / plan / left+right extras / context meter hide until the
+   desktop shell; they remain in the + command menu or the session header. */
+:global([data-surface='side-panel']) .row {
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+:global([data-surface='side-panel']) .tools {
+  flex: none;
+  gap: 0;
+}
+
+:global([data-surface='side-panel']) .modes,
+:global([data-surface='side-panel']) .tools > :not(.add):not(.modes),
+:global([data-surface='side-panel']) .trailingExtras,
+:global([data-surface='side-panel']) .meter {
+  display: none;
+}
+
+:global([data-surface='side-panel']) .trailing {
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+:global([data-surface='side-panel']) .modelSeat {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 /* Attach circle (figma + control): 28px, selector fill, primary glyph. */
 .add {
   display: grid;

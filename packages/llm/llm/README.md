@@ -20,6 +20,8 @@ An adapter registry plus a single streaming call API, interceptable via a waterf
 - `ctx.llm.providerRetryPolicy(provider: string): ResolvedRetryPolicy` Return the provider-owned retry policy captured during registration, with normal defaults resolved.
 - `ctx.llm.listModels(provider: string): Promise<LlmModelInfo[]>` Discover the models one registered provider currently advertises.
 - `ctx.llm.resolveModelInfo(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>` Resolve validated exact-model identity plus available context, output-default, and reasoning metadata from the owning adapter, with optional cancellation for asynchronous adapters.
+- `ctx.llm.registerImageFallback(fallback: LlmImageFallback): () => void` Register the process's sole effect-scoped image-to-text fallback; duplicate registration fails with `DUPLICATE_IMAGE_FALLBACK`.
+- `ctx.llm.resolveImageInput(provider: string, model: string, signal?: AbortSignal): Promise<ImageInputResolution>` Resolve one exact route as `native`, `fallback`, `unsupported`, or `unknown`; absent modality metadata remains unknown and never selects fallback by inference.
 - `ctx.llm.resolveCallConfig(config: LlmCallConfig, signal?: AbortSignal): Promise<LlmCallConfig>` Validate an explicit effort and materialize adapter-configured call defaults without clamping.
 - `ctx.llm.prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<PreparedLlmCall>` Resolve a config plus detached context metadata and markers for fields supplied by adapter defaults in one exact-model lookup, then capture its current adapter registration and immutable retry policy as one cancellable, one-shot call.
 - `ctx.llm.stream(options: GenerateOptions): AsyncIterable<StreamChunk>` Stream one model call as raw chunks (token-level deltas). Consumers assemble the chunks into blocks/messages with `BlockAssembler`.
@@ -32,7 +34,7 @@ Provider and model metadata is a discovery surface, not a routing whitelist. `re
 
 Every topology commit point — adapter routes registering or disposing, directory entries appearing or withdrawing — emits the payload-free `llm/adapters-updated` event after the mutation, so consumers re-read `listProviders()`/`listModels()`/`listConfigurableProviders()` instead of polling. Observer failures are contained (logged, non-vetoing); only `INVARIANT`-coded failures rethrow after the fan-out.
 
-Exact-model metadata is a separate correctness query, not a catalog decoration or global LLM setting. `resolveModelInfo()` asks the adapter that owns the exact provider/model route once; an adapter can describe an unlisted dynamic model, and absent `context`, `defaultMaxTokens`, or `reasoning` fields preserve unknown capacity, provider-owned output defaults, or unavailable reasoning capability. Invalid identity, context, output default, or reasoning metadata fails with `INVALID_MODEL_INFO`, `INVALID_MODEL_CONTEXT`, `INVALID_MODEL_MAX_TOKENS`, or `INVALID_MODEL_REASONING`.
+Exact-model metadata is a separate correctness query, not a catalog decoration or global LLM setting. `resolveModelInfo()` asks the adapter that owns the exact provider/model route once; an adapter can describe an unlisted dynamic model, and absent `context`, `defaultMaxTokens`, `reasoning`, or `inputModalities` fields preserve unknown capacity, provider-owned output defaults, unavailable reasoning, or unknown modality capability. Invalid identity, context, output default, or reasoning metadata fails with `INVALID_MODEL_INFO`, `INVALID_MODEL_CONTEXT`, `INVALID_MODEL_MAX_TOKENS`, or `INVALID_MODEL_REASONING`. `resolveImageInput()` preserves the modality distinction: native image metadata wins, explicit exclusion consults the installed fallback, and unknown metadata remains adapter-owned.
 
 `defaultMaxTokens` is an adapter-configured per-request output cap, not a model hard limit. `resolveCallConfig()` materializes it only when the request omits `maxTokens`; an explicit cap wins. Reasoning identifiers are opaque adapter-owned strings rather than a core enum: the same resolution accepts only an exact advertised identifier, materializes `defaultEffort` when present, and otherwise preserves the provider default. Asynchronous model resolvers receive the caller's signal and must settle promptly after cancellation. `prepareCall()` additionally exposes detached context metadata from the same lookup, reports which `maxTokens` and `reasoningEffort` fields it materialized in `adapterDefaults`, and retains the exact adapter registration through header logging and terminal dispatch, so HMR cannot combine one adapter's capability result with another adapter's request; reusing its one-shot handle or changing its call-config fields fails with `INVALID_PREPARED_CALL`. An unsupported explicit or configured effort fails with `UNSUPPORTED_REASONING_EFFORT` before provider I/O.
 
@@ -51,7 +53,7 @@ Exact-model metadata is a separate correctness query, not a catalog decoration o
 
 `Message` is the shared immutable value used by delivery, durable history, and model requests. Every message has a required `MessageId`, role, content, and typed source from creation onward. `createMessage(input)` mints the identity and returns a detached deep-frozen value; `createUserMessage({ content, source })` fixes the user role; `createAssistantMessage({ content, source })` fixes the assistant role and model source kind; `createToolResultMessage({ callId, content, isError })` fixes the user role and couples the tool source to its result block; `freezeMessage(message)` imports an identity that already exists and never replaces it. Message rewrites preserve the identity and produce another frozen value. Browser code imports these value constructors from the dependency-minimal `@deepseek-ai/dsh-llm/message` entry instead of the service-bearing package root.
 
-Message content is an array of typed blocks: `text`, `reasoning`, `tool-call`, `tool-result`. The union is derived from the merge-extensible `ContentBlockMap`, so plugins can add block types via declaration merging. Assistant messages use a model source carrying the provider and model that produced them plus optional adapter-private replay state. Before dispatch, `LlmRuntime` retains that state only when the historical provider route and target provider route are currently owned by the exact same adapter instance; the adapter then decides whether it can restore or convert the state across models/providers. The core block set is limited to blocks every shipping path honors — multimodal content (images, audio, …) has no core block type; a feature that needs one adds it via the map together with the adapter/UI/compaction support that honors it.
+Message content is an array of typed blocks: `text`, `reasoning`, `image`, `tool-call`, `tool-result`. The union is derived from the merge-extensible `ContentBlockMap`, so plugins can add block types via declaration merging. Assistant messages use a model source carrying the provider and model that produced them plus optional adapter-private replay state. Before dispatch, `LlmRuntime` retains that state only when the historical provider route and target provider route are currently owned by the exact same adapter instance; the adapter then decides whether it can restore or convert the state across models/providers. Image blocks carry durable attachment references; native visual adapters resolve their bytes, while a registered `LlmImageFallback` may replace them with logged text only for an exact model that explicitly excludes image input.
 
 Streaming is a raw chunk protocol (`block-start`, `text-delta`, `reasoning-delta`, `tool-call-delta`, `block-end`, `usage`, `finish`). Every adapter outcome reaches consumers as one terminal `finish`; operational failure uses its `error` or `aborted` reason rather than throwing across the stream API. `BlockAssembler` is the single shared implementation that assembles chunks into blocks/messages.
 
@@ -85,11 +87,19 @@ Two adapters implement `LlmAdapter` on different internals: [`@deepseek-ai/dsh-l
 
 ## Model Experience
 
-None, as the service adds no model-bound text, schema, or message; it only materializes and logs an adapter-configured reasoning effort.
+### Automatic image fallback
+
+#### What the model sees
+
+When an image-bearing call targets a model that explicitly excludes image input, a registered `LlmImageFallback` may replace the images with its durable text projection. The provider owns and logs that text; native visual, unknown-capability, and no-fallback routes receive no service-owned content.
+
+#### Token effect
+
+The service adds no fixed tokens. A fallback provider determines the conditional auxiliary request and the replacement text charged as target-model input.
 
 #### KV Cache effect
 
-Pass-through; the registry preserves the assembled request prefix, while the selected adapter and provider own cache reuse and routing boundaries.
+Pass-through for native visual and unknown-capability routes. A fallback may replace image blocks with durable text before the target adapter; that provider owns the resulting prefix behavior.
 
 ## Known Limitations and Deferred Work
 
@@ -99,3 +109,4 @@ Pass-through; the registry preserves the assembled request prefix, while the sel
 - **`BlockAssembler` handles core block kinds only** — a plugin-added block type whose stream is never closed by `block-end` makes `blocks()` throw.
 - **`APP_IDENTITY.url` names a repository that does not exist yet** — the public home must be reachable before release.
 - **`GenerateOptions.sessionId` is a locally-declared brand** — importing dsh-session's `SessionId` would cycle; a future ids-owning package would dissolve the workaround.
+- **One image fallback per process** — deployments replace the registered plugin through composition instead of stacking implicit fallback precedence.

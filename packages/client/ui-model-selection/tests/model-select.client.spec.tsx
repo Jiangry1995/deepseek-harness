@@ -182,3 +182,30 @@ describe('ModelSelect reasoning effort', () => {
     expect(load).not.toHaveBeenCalled()
   })
 })
+
+describe('compactModelLabel', () => {
+  it('strips a leading DeepSeek vendor prefix and leaves other names intact', async () => {
+    const { compactModelLabel } = await import('../src/client/compactModelLabel.ts')
+    expect(compactModelLabel('DeepSeek-V4-Flash')).toBe('V4-Flash')
+    expect(compactModelLabel('DeepSeek')).toBe('DeepSeek')
+    expect(compactModelLabel('Qwen3')).toBe('Qwen3')
+  })
+
+  it('keeps the full name in the trigger aria and tooltip while exposing a compact span', () => {
+    render(<ModelSelect
+      locked={false}
+      available
+      directory={createSnapshotStore(state())}
+      load={vi.fn()}
+      select={vi.fn().mockResolvedValue(true)}
+      t={t}
+    />)
+    const trigger = screen.getByRole('button', {
+      name: '选择模型，当前 DeepSeek-V4-Flash，推理等级 High',
+    })
+    expect(trigger.getAttribute('title')).toBe('DeepSeek-V4-Flash · High')
+    const compact = [...trigger.querySelectorAll('span')]
+      .find(node => node.className.includes('triggerLabelCompact'))
+    expect(compact?.textContent).toBe('V4-Flash')
+  })
+})

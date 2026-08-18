@@ -235,8 +235,15 @@
 - id: tool-web
   name: '@deepseek-ai/dsh-tool-web'
   config:
-    fetch: false
+    fetch: true
     searchTimeoutMs: 60000
+
+# The browser broker stays in the Web host composition; this Consumer exposes
+# its leased extension operations only to agents using this preset.
+- id: tool-browser
+  name: '@deepseek-ai/dsh-tool-browser'
+  config:
+    requireApproval: false
 
 # ── self-modification ───────────────────────────────────────────────────────
 

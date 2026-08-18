@@ -1,0 +1,67 @@
+{
+  "name": "@deepseek-ai/dsh-client-browser-extension",
+  "description": "Chromium MV3 side assistant and tab provider for DeepSeek Harness",
+  "version": "0.1.0-rc.5",
+  "publishConfig": { "access": "public" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "directory": "packages/client/browser-extension"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": { "types": "./lib/types/index.d.ts", "default": "./lib/index.js" },
+    "./invariant": { "types": "./lib/types/invariant.d.ts", "default": "./lib/invariant.js" },
+    "./client": { "types": "./lib/types/client/index.d.ts", "default": "./lib/client.js" },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-runtime"
+      ],
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "bundle": "tsdown",
+    "watch": "tsdown --watch",
+    "windows:build": "pwsh -NoProfile -File ./windows/build.ps1",
+    "windows:test": "pwsh -NoProfile -File ./windows/build.ps1 -RunTests",
+    "windows:install": "pwsh -NoProfile -File ./windows/install.ps1",
+    "windows:uninstall": "pwsh -NoProfile -File ./windows/uninstall.ps1"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@deepseek-ai/dsh-api-remotes": "workspace:^"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "workspace:^",
+    "@deepseek-ai/dsh-client-runtime": "workspace:^"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.2.6",
+    "@deepseek-ai/dsh-client-runtime": "workspace:^",
+    "@deepseek-ai/dsh-invariants": "workspace:^",
+    "@deepseek-ai/cordis": "workspace:^"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/invariant.js",
+    "lib/client.js",
+    "lib/types/**/*.d.ts",
+    "extension/manifest.json",
+    "extension/background.js",
+    "extension/content.js",
+    "extension/page-content.js",
+    "extension/sidepanel.html",
+    "extension/sidepanel.css",
+    "extension/sidepanel.js",
+    "windows/*.cs",
+    "windows/*.ps1"
+  ]
+}

@@ -83,6 +83,67 @@
   color: var(--dsw-alias-label-primary);
 }
 
+/* One shared chrome for the secret row so password inputs cannot bring
+   browser-default thick borders; matches `.input` exactly. */
+.secretRow {
+  display: flex;
+  align-items: stretch;
+  height: 34px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-3);
+  overflow: hidden;
+}
+
+.secretRow:focus-within {
+  border-color: var(--dsw-alias-brand-primary);
+}
+
+.secretInput {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 12px;
+  border: none;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dsw-alias-label-primary);
+}
+
+.eye {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+.secretInput:disabled {
+  color: var(--dsw-alias-label-tertiary);
+  cursor: default;
+}
+
+.eye:hover:not(:disabled) {
+  color: var(--dsw-alias-label-primary);
+}
+
+.eye:disabled {
+  color: var(--dsw-alias-label-tertiary);
+  cursor: default;
+}
+
 .input:focus-visible {
   outline: none;
   border-color: var(--dsw-alias-brand-primary);

@@ -50,10 +50,12 @@ class CatalogAdapter extends LlmAdapter {
 
   override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
     if (this.exactError !== undefined) return Promise.reject(this.exactError)
+    const listed = this.models instanceof Error ? undefined : this.models.find(candidate => candidate.id === model)
     return Promise.resolve({
       provider,
       id: model,
       name: model,
+      ...listed?.inputModalities === undefined ? {} : { inputModalities: listed.inputModalities },
       ...this.reasoning === undefined ? {} : { reasoning: this.reasoning },
     })
   }
@@ -128,7 +130,38 @@ function registerTextOnly(ctx: Context): void {
   }('Text Only', []))
 }
 
+/** Install an always-ready fallback for Host admission tests; projection runs at stream time. */
+function registerImageFallback(ctx: Context): void {
+  ctx.llm.registerImageFallback({
+    available: () => Promise.resolve(true),
+    project: options => Promise.resolve(options.messages),
+  })
+}
+
 describe('Web session model selection', () => {
+  it('projects exact input modalities into the host-scoped model catalog', async () => {
+    const { ctx } = await harness()
+    ctx.llm.registerAdapter(['visual-catalog'], new CatalogAdapter('Visual Catalog', [{
+      provider: 'visual-catalog',
+      id: 'vision',
+      name: 'Vision',
+      inputModalities: ['text', 'image'],
+    }]))
+    const api = createApiProxy(ctx, {
+      defaultModelSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }),
+      cwd: '/tmp',
+    })
+
+    const response = await api.llm.models(request({}))
+
+    expect(expectValue(response).groups.find(group => group.id === 'visual-catalog')).toEqual({
+      id: 'visual-catalog',
+      name: 'Visual Catalog',
+      models: [{ id: 'vision', name: 'Vision', inputModalities: ['text', 'image'] }],
+    })
+    await ctx.fiber.dispose()
+  })
+
   it('validates an ordered image batch before persisting any member', async () => {
     const { ctx, agent, sessionId } = await harness()
     const validateImage = vi.fn((_input: { data: Uint8Array }) => Promise.resolve())
@@ -231,6 +264,58 @@ describe('Web session model selection', () => {
     expect(expectValue(await api.sessions.selectModel(request({
       sessionId, provider: 'text-only', model: 'plain',
     }))).selected).toEqual({ provider: 'text-only', model: 'plain' })
+    await ctx.fiber.dispose()
+  })
+
+  it('admits image history and uploads on a text-only model when automatic fallback is ready', async () => {
+    const { ctx, agent, sessionId } = await harness()
+    registerTextOnly(ctx)
+    registerImageFallback(ctx)
+    const image = {
+      type: 'image' as const,
+      attachment: { attachmentId: 'att-history', mediaType: 'image/png' as const, bytes: 1, width: 1, height: 1 },
+    }
+    agent.session.append('user/message', {
+      id: 'image-message', role: 'user', source: { kind: 'user' }, content: [image],
+    } as never, { surfaceOp: 'append' })
+    const validateImage = vi.fn(() => Promise.resolve())
+    const saveImage = vi.fn(() => Promise.resolve({
+      attachmentId: 'att-upload', mediaType: 'image/png' as const, bytes: 1, width: 1, height: 1,
+    }))
+    ctx.provide('attachments', {
+      imageLimits: {
+        maxImageBytes: 4,
+        maxImagesPerMessage: 2,
+        maxMessageImageBytes: 4,
+        maxImagePixels: 4,
+        mediaTypes: ['image/png'],
+      },
+      validateImage,
+      saveImage,
+    } as never)
+    const followup = vi.fn()
+    Object.assign(agent, { followup })
+    const api = createApiProxy(ctx, {
+      defaultModelSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }),
+      cwd: '/tmp',
+    })
+
+    expect(expectValue(await api.sessions.selectModel(request({
+      sessionId, provider: 'text-only', model: 'plain',
+    }))).selected).toEqual({ provider: 'text-only', model: 'plain' })
+    expect((await api.sessions.prompt(request({
+      sessionId,
+      mode: 'queue' as const,
+      content: [{ type: 'image' as const, mediaType: 'image/png' as const, data: 'AQ==' }],
+    }))).result.ok).toBe(true)
+    expect(validateImage).toHaveBeenCalledOnce()
+    expect(saveImage).toHaveBeenCalledOnce()
+    expect((followup.mock.calls[0]?.[0] as UserMessage).content).toEqual([{
+      type: 'image',
+      attachment: {
+        attachmentId: 'att-upload', mediaType: 'image/png', bytes: 1, width: 1, height: 1,
+      },
+    }])
     await ctx.fiber.dispose()
   })
 

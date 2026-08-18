@@ -43,8 +43,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * the seats it declares disappear with it. To add something to the
      * sidebar, register into one of those inner seats instead.
      *
-     * The occupant receives the frame's live column state (collapsed, width)
-     * and is expected to render the compact control rail while collapsed.
+     * The occupant receives the frame's live column state (collapsed, width,
+     * and an optional `surface` flag). Desktop collapsed still renders the
+     * compact control rail. The Chrome side-panel iframe (`dsh-surface=
+     * side-panel`) passes `surface: 'side-panel'` instead of a rail: the
+     * column width is zero and chrome moves into a top bar + history drawer.
      */
     'sidebar': { kind: 'single'; scope: 'root'; owner: SidebarOwnerProps }
     /**
@@ -94,8 +97,13 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 export interface SidebarOwnerProps {
   /** True when the sidebar is closed (the column renders the compact control rail). */
   collapsed: boolean
-  /** Rendered column width in px (SIDEBAR_COLLAPSED when collapsed). */
+  /** Rendered column width in px (SIDEBAR_COLLAPSED when collapsed; 0 in the side panel). */
   width: number
+  /**
+   * Set only in the Chrome side-panel iframe. Omitted on the desktop shell so
+   * a narrow window still uses the collapsed rail rather than the plugin chrome.
+   */
+  surface?: 'side-panel'
 }
 
 /** Conversation owner share: business state and actions belong to the registrant. */

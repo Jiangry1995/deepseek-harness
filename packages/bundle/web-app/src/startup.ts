@@ -3,15 +3,29 @@
  * family (`--host`, `--port`, `--trusted-host`) and its `--help`
  * text, then provides the immutable values as {@link WEB_STARTUP_SERVICE}.
  * Ordinary rows inject that service before reading it from lazy config.
+ *
+ * It also claims the address it is about to serve. This is the earliest point
+ * where that address is known, so it is where a duplicate boot can be refused
+ * while it is still cheap — see `./single-instance.ts`.
  * @module @deepseek-ai/dsh-web-app/startup
  */
 
 import { Command } from 'commander'
 import type { Context } from '@deepseek-ai/cordis'
 import { parseCmdline } from '@deepseek-ai/dsh-cmdline'
+import { claimWebAddress, WebAddressBusyError } from './single-instance.ts'
 
 /** Stable Cordis plugin name. */
 export const name = 'web-startup'
+
+/**
+ * Bind address this bundle composes when the invocation names no flag.
+ * These restate `cordis.patch.yml`'s webserver row, which is what makes the
+ * intended address knowable here — before the tree spends tens of seconds
+ * loading — rather than only at `listen` time.
+ */
+const DEFAULT_HOST = '127.0.0.1'
+const DEFAULT_PORT = 3080
 
 /** Services required before the flags can be resolved. */
 export const inject = ['cmdlineArgs']
@@ -57,9 +71,9 @@ Examples:
 
 /**
  * Parse and provide the Web invocation as an ordinary Cordis service. The
- * command's action publishes the flags this invocation named; `--host 0.0.0.0`
- * or a non-numeric `--port` is a usage error, so on rejection (and on `--help`)
- * nothing is provided.
+ * command's action publishes the flags this invocation named; `--host 0.0.0.0`,
+ * a non-numeric `--port`, and an address another live app already claimed are
+ * usage errors, so on rejection (and on `--help`) nothing is provided.
  * @param ctx - plugin context carrying the command line.
  */
 export function apply(ctx: Context): void {
@@ -71,6 +85,13 @@ export function apply(ctx: Context): void {
     }
     if (options.port !== undefined && !/^\d+$/.test(options.port)) {
       program.error(`error: --port must be a number, got ${JSON.stringify(options.port)}`)
+    }
+    try {
+      const release = claimWebAddress(options.host ?? DEFAULT_HOST, options.port === undefined ? DEFAULT_PORT : Number(options.port))
+      ctx.effect(() => () => { release() }, 'web address claim')
+    } catch (error) {
+      if (!(error instanceof WebAddressBusyError)) throw error
+      program.error(`error: ${error.message}`)
     }
     ctx.provide(WEB_STARTUP_SERVICE, {
       ...options.host !== undefined && { host: options.host },

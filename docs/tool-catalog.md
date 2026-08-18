@@ -23,7 +23,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-cordis` | `cordis_define`, `cordis_inspect_list`, `cordis_inspect_query`, `cordis_inspect_self`, `cordis_run`, `cordis_stop`, `cordis_undefine` | `ctx.tools`, `ctx.dynamicCordisRunner` | `tool/call`, `tool/result`, `process-local dynamic package lifecycle` | - | Not in any shipped tree (a deliberate opt-in — dynamic package code reaches the real runtime, see .agents/notes/implemented/feature/2026-07-08-self-referential-cordis-toolset.md). The toolset injects `ctx.dynamicCordisRunner` from `@deepseek-ai/dsh-cordis-host-runner`, which owns the definition registry and the vm sandbox; a composition missing it never activates the tools. A running package may register ADDITIONAL model-visible tools until it is stopped, undefined, or DSH restarts; a full changed request header logs those tool-set changes. |
 | `@deepseek-ai/dsh-tool-bash-persistent` | `bash` | `ctx.tools`, `ctx.terminals`, `an owning Agent at execution time` | `tool/call`, `PTY shell state`, `tool/result` | - | One owner-isolated persistent bash tool; deployment composition supplies the PTY backend and may override the model-facing environment description. |
 | `@deepseek-ai/dsh-tool-str-replace-editor` | `str_replace_editor` | `ctx.tools`, `ctx.fs` | `tool/call`, `fs/observed after view presence/absence, edit absence, or successful mutation`, `tool/result` | - | Standalone view/create/unique literal replace/line insert tool over the filesystem seam; it composes with any shell or terminal API. |
-| `@deepseek-ai/dsh-tool-fs` | `edit`, `read`, `read_image`, `write` | `ctx.tools`, `ctx.fs`, `ctx.systemPrompt`, `ctx.attachments (read_image registration)`, `ctx.llm + an image-capable route (read_image execution)` | `tool/call`, `fs/write-intent or fs/edit-intent for mutations`, `fs/observed after read presence/absence or successful file operation`, `durable attachment (read_image)`, `tool/result` | - | The read-before-write/edit policy is added by `@deepseek-ai/dsh-fs-observation-policy` (an `fs/*` event-gate plugin, no schema change); a deployment that loads these tools is expected to also load it. `read_image` is not registered without `ctx.attachments`; its schema is route-independent, and execution refuses unless the exact routed model declares image input. |
+| `@deepseek-ai/dsh-tool-fs` | `edit`, `read`, `read_image`, `write` | `ctx.tools`, `ctx.fs`, `ctx.systemPrompt`, `ctx.attachments (read_image registration)`, `ctx.llm + native image input or an automatic fallback (read_image execution)` | `tool/call`, `fs/write-intent or fs/edit-intent for mutations`, `fs/observed after read presence/absence or successful file operation`, `durable attachment (read_image)`, `tool/result` | - | The read-before-write/edit policy is added by `@deepseek-ai/dsh-fs-observation-policy` (an `fs/*` event-gate plugin, no schema change); a deployment that loads these tools is expected to also load it. `read_image` is not registered without `ctx.attachments`; its schema is route-independent, and execution requires native image input or a confirmed automatic fallback. |
 | `@deepseek-ai/dsh-tool-fs-search` | `glob`, `grep` | `ctx.tools`, `ctx.subprocess`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | glob and grep are unconditional discovery tools that spawn the packaged ripgrep binary (`@vscode/ripgrep`) through ctx.subprocess as ordinary foreground calls (never background jobs) — no host `rg` install and no shell layer. The catalog uses `sampleOverCapGlobResults: true`; deployments must choose that behavior explicitly. Capped results save the complete formatted list through the optional ctx.spillStore backend; returned locators are follow-up-readable/searchable when the backend exposes local paths in co-located deployments. |
 | `@deepseek-ai/dsh-tool-terminal` | `terminal_close`, `terminal_list`, `terminal_open`, `terminal_read`, `terminal_send`, `terminal_signal` | `ctx.tools`, `ctx.terminals`, `ctx.systemPrompt`, `ctx.jobs at call time for run_in_background` | `tool/call`, `tool/result` | - | The six terminal tools are opt-in and complement one-shot shell/filesystem tools. `terminal_send(run_in_background: true)` registers with `ctx.jobs`; TUI, named key sequences, BEL, resize, auto-start, and cross-agent sharing are absent from the schema. |
 | `@deepseek-ai/dsh-tool-goal` | `create_goal`, `get_goal`, `update_goal` | `ctx.tools`, `ctx.agents`, `ctx.goals`, `ctx.systemPrompt`, `a calling Agent in an authorized open turn` | `tool/call`, `goal/change for mutations`, `tool/result` | - | create, edit, pause, and resume require direct-human root authority; complete and blocked also accept the exact current goal round. The default blocked lower bound is three admitted rounds. |
@@ -38,6 +38,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-jobs` | `job_kill`, `job_list`, `job_output` | `ctx.tools`, `ctx.jobs`, `ctx.systemPrompt` | `tool/call`, `tool/result`, `user/message via agent.inject() for background completion notices` | - | The kind-agnostic background-job controller: background bash commands, PTY sends, and subagents are read, listed, and killed through the same three tools. Loading the plugin attaches the controller that arms producers' `ctx.jobs.start()`. |
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`, `owning Agent session` | `tool/call`, `todo/write`, `tool/result` | - | todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task. |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`, `ctx.workflowEngine`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents the script children)` | `tool/call`, `tool/result` | - | - |
+| `@deepseek-ai/dsh-tool-browser` | `browser_activate_tab`, `browser_click`, `browser_close_tab`, `browser_fill`, `browser_focus`, `browser_list_tabs`, `browser_open_tab`, `browser_press`, `browser_read_page`, `browser_scroll`, `browser_select`, `browser_wait_for` | `ctx.tools`, `ctx.browser`, `ctx.systemPrompt` | `tool/call`, `browser/command Remote event`, `tool/result` | - | Browser tools keep the MV3 provider and leased Host routing behind ctx.browser; every operation enters the approval chain by default. |
 | `@deepseek-ai/dsh-tool-web` | `web_fetch`, `web_search` | `ctx.tools`, `ctx.web`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps. |
 
 <a id="deepseek-aidsh-tool-ask-user"></a>
@@ -666,7 +667,7 @@ Source: [`packages/fs/tool-fs/src/index.ts`](../packages/fs/tool-fs/src/index.ts
 
 ### `read_image`
 
-Read a PNG/JPEG/WebP/GIF file and return the image itself. Requires the current model to accept image input.
+Read a PNG/JPEG/WebP/GIF file and return the image itself. Requires native image input or a configured automatic vision fallback.
 
 ```json
 {
@@ -711,7 +712,7 @@ Create or fully replace a UTF-8 text file.
 
 Source: [`packages/fs/tool-fs/src/index.ts`](../packages/fs/tool-fs/src/index.ts)
 
-The read-before-write/edit policy is added by `@deepseek-ai/dsh-fs-observation-policy` (an `fs/*` event-gate plugin, no schema change); a deployment that loads these tools is expected to also load it. `read_image` is not registered without `ctx.attachments`; its schema is route-independent, and execution refuses unless the exact routed model declares image input.
+The read-before-write/edit policy is added by `@deepseek-ai/dsh-fs-observation-policy` (an `fs/*` event-gate plugin, no schema change); a deployment that loads these tools is expected to also load it. `read_image` is not registered without `ctx.attachments`; its schema is route-independent, and execution requires native image input or a confirmed automatic fallback.
 
 <a id="deepseek-aidsh-tool-fs-search"></a>
 
@@ -1214,7 +1215,7 @@ A fixed foreground workflow starts one fresh structured child per round; the mod
 
 ### `skill`
 
-Load the full instructions for an available skill. Call this with the exact skill name from the session skill catalog before acting on a task that names or clearly matches that skill.
+Load the full instructions for an available skill. If the user names a skill, call this with its exact catalog name before acting. Otherwise, choose the capability from the requested outcome and execution environment first, then load a skill only when its instructions are needed for that approach. Catalog descriptions are capability summaries, not routing instructions. Do not load a skill for topical overlap alone when an available direct tool performs the requested effect.
 
 ```json
 {
@@ -1823,6 +1824,373 @@ Constraints: concurrency and total-agent caps apply; no filesystem, network, tim
 ```
 
 Source: [`packages/workflow/tool-workflow/src/index.ts`](../packages/workflow/tool-workflow/src/index.ts)
+
+<a id="deepseek-aidsh-tool-browser"></a>
+
+## `@deepseek-ai/dsh-tool-browser`
+
+### `browser_activate_tab`
+
+Activate a browser tab by its browser-assigned id.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "tabId": {
+      "type": "number",
+      "description": "Non-negative tab id returned by browser_list_tabs or browser_open_tab."
+    }
+  },
+  "required": [
+    "tabId"
+  ]
+}
+```
+
+Source: [`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_click`
+
+Click a visible enabled element using pageId and ref from the latest browser_read_page result.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "pageId": {
+      "type": "string",
+      "description": "Page id from the latest browser_read_page result."
+    },
+    "ref": {
+      "type": "string",
+      "description": "Element ref from the same browser_read_page result."
+    }
+  },
+  "required": [
+    "pageId",
+    "ref"
+  ]
+}
+```
+
+Source: [`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_close_tab`
+
+Close a browser tab by its browser-assigned id.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "tabId": {
+      "type": "number",
+      "description": "Non-negative tab id returned by browser_list_tabs or browser_open_tab."
+    }
+  },
+  "required": [
+    "tabId"
+  ]
+}
+```
+
+Source: [`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_fill`
+
+Replace text in a visible editable field using pageId and ref from the latest browser_read_page result.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "pageId": {
+      "type": "string",
+      "description": "Page id from the latest browser_read_page result."
+    },
+    "ref": {
+      "type": "string",
+      "description": "Field ref from the same browser_read_page result."
+    },
+    "value": {
+      "type": "string",
+      "description": "Complete replacement text."
+    },
+    "submit": {
+      "type": "boolean",
+      "description": "Submit the owning form or dispatch Enter after filling. Defaults to false."
+    }
+  },
+  "required": [
+    "pageId",
+    "ref",
+    "value"
+  ]
+}
+```
+
+Source: [`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_focus`
+
+Focus a field or focusable action using pageId and ref from the latest browser_read_page result. Success requires document.activeElement to be that element.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "pageId": {
+      "type": "string",
+      "description": "Page id from the latest browser_read_page result."
+    },
+    "ref": {
+      "type": "string",
+      "description": "Element ref from the same browser_read_page result."
+    }
+  },
+  "required": [
+    "pageId",
+    "ref"
+  ]
+}
+```
+
+Source: [`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_list_tabs`
+
+List tabs in the current browser window, including ids, active state, URLs, and titles when available. Do not use this to summarize or inspect the current page; use browser_read_page instead.
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+Source: [`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_open_tab`
+
+Open an absolute HTTP(S) URL in a new tab of the user's current Chromium window. Use this when the user asks to go to, open, or visit a website; do not substitute the skill tool or a shell CLI.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "url": {
+      "type": "string",
+      "description": "Absolute HTTP(S) URL without embedded credentials."
+    },
+    "active": {
+      "type": "boolean",
+      "description": "Whether the new tab becomes active. Defaults to true."
+    }
+  },
+  "required": [
+    "url"
+  ]
+}
+```
+
+Source: [`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_press`
+
+Press one allowed key against a referenced element from the latest browser_read_page result. Allowed keys: Enter, Escape, Tab, Space, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Home, End, PageUp, PageDown, Backspace, Delete. Repeat is 1-20.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "pageId": {
+      "type": "string",
+      "description": "Page id from the latest browser_read_page result."
+    },
+    "ref": {
+      "type": "string",
+      "description": "Element ref from the same browser_read_page result."
+    },
+    "key": {
+      "type": "string",
+      "description": "Allowed key name. Arbitrary key names are rejected."
+    },
+    "ctrl": {
+      "type": "boolean",
+      "description": "Hold Control. Defaults to false."
+    },
+    "alt": {
+      "type": "boolean",
+      "description": "Hold Alt. Defaults to false."
+    },
+    "shift": {
+      "type": "boolean",
+      "description": "Hold Shift. Defaults to false."
+    },
+    "meta": {
+      "type": "boolean",
+      "description": "Hold Meta. Defaults to false."
+    },
+    "repeat": {
+      "type": "number",
+      "description": "Repeat count from 1 through 20. Defaults to 1."
+    }
+  },
+  "required": [
+    "pageId",
+    "ref",
+    "key"
+  ]
+}
+```
+
+Source: [`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_read_page`
+
+Read bounded visible text and current non-secret form values from a browser tab, including textarea and input values, scroll targets, and viewport metrics. Omit tabId to read the current active web tab. Password, file, hidden, one-time-code, and payment-secret controls are excluded.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "tabId": {
+      "type": "number",
+      "description": "Browser-assigned tab id to read without first activating it. Omit to read the current active web tab."
+    }
+  }
+}
+```
+
+Source: [`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_scroll`
+
+Scroll the document viewport or one scroll target returned by the latest browser_read_page result. Omit ref to scroll the page. If the container is already at the requested boundary, the result says so instead of claiming a move.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "pageId": {
+      "type": "string",
+      "description": "Page id from the latest browser_read_page result."
+    },
+    "ref": {
+      "type": "string",
+      "description": "Scroll-target ref from the same browser_read_page result. Omit to scroll the document viewport."
+    },
+    "movement": {
+      "type": "string",
+      "description": "One of line-up, line-down, line-left, line-right, page-up, page-down, page-left, page-right, top, bottom, left-edge, right-edge."
+    }
+  },
+  "required": [
+    "pageId",
+    "movement"
+  ]
+}
+```
+
+Source: [`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_select`
+
+Select a native option by exact value or visible text using pageId and ref from browser_read_page.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "pageId": {
+      "type": "string",
+      "description": "Page id from the latest browser_read_page result."
+    },
+    "ref": {
+      "type": "string",
+      "description": "Native select ref from the same browser_read_page result."
+    },
+    "value": {
+      "type": "string",
+      "description": "Exact option value or visible option text."
+    }
+  },
+  "required": [
+    "pageId",
+    "ref",
+    "value"
+  ]
+}
+```
+
+Source: [`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_wait_for`
+
+Wait until a page changes, shows or hides text, reaches a URL, or becomes stable, then return a fresh page snapshot. Prefer pageId from the latest browser_read_page result; use tabId only when no page snapshot exists. Never invent a tab id.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "pageId": {
+      "type": "string",
+      "description": "Page id from the latest browser_read_page result. Preferred because it stays bound to the tab that produced the snapshot."
+    },
+    "tabId": {
+      "type": "number",
+      "description": "Browser-assigned tab id to observe only when no pageId is available."
+    },
+    "condition": {
+      "type": "object",
+      "description": "Wait condition: {kind:\"change\",documentId,afterRevision}, {kind:\"text\",text,state:\"present\"|\"absent\"}, {kind:\"url\",value,match:\"exact\"|\"prefix\"|\"contains\"}, or {kind:\"ready\"}.",
+      "additionalProperties": true,
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "documentId": {
+          "type": "string"
+        },
+        "afterRevision": {
+          "type": "number"
+        },
+        "text": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "match": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "timeoutMs": {
+      "type": "number",
+      "description": "Maximum wait in milliseconds from 100 through 30000. Defaults to 5000."
+    },
+    "stableMs": {
+      "type": "number",
+      "description": "Quiet period in milliseconds from 0 through 2000. Defaults to 150."
+    }
+  },
+  "required": [
+    "condition"
+  ]
+}
+```
+
+Source: [`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+Browser tools keep the MV3 provider and leased Host routing behind ctx.browser; every operation enters the approval chain by default.
 
 <a id="deepseek-aidsh-tool-web"></a>
 

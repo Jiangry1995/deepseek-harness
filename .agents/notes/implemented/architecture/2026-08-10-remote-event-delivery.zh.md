@@ -8,7 +8,7 @@ Status: implemented
 
 [Typert Remote 方法调用](../../implemented/architecture/2026-08-02-typert-remote-method-calls.md)只覆盖「一次请求一个结果」的定向调用，明确把 Session 事件流与有状态交互留在别处；Host 向消费端的**单向事件推送**因此仍然全部压在遗留的 API Proxy 上。
 
-Host 拥有 `agent-preset/selected`、`commands/change`、`credentials/updated`、`llm/adapters-updated`、`settings/document-updated` 这五条单向事件；它们既不依赖 AgentScope，载荷也本来就是 JSON。过去每条都要穿过 host cordis 事件、apiproxy 手写帧、client/runtime 手写桥和 Client 事件别名才能抵达 UI，而这些层没有陈述 owner 事件之外的新事实。
+Host 拥有 `agent-preset/selected`、`browser/command`、`commands/change`、`credentials/updated`、`llm/adapters-updated`、`settings/document-updated` 这六条单向事件；它们既不依赖 AgentScope，载荷也本来就是 JSON。共享载体出现前，每条事件都要穿过 Host cordis 事件、apiproxy 手写帧、client/runtime 手写桥和 Client 事件别名才能抵达 UI，而这些层没有陈述 owner 事件之外的新事实。
 
 那份重复声明还是**有损**的：client 侧写成 `settings/changed(ns: string)`，brand 类型在这一跳被拍平成裸 `string`，与 Remote 方法侧「消费端类型指向业务包唯一符号」的既有契约相反。
 
@@ -22,9 +22,9 @@ Host 拥有 `agent-preset/selected`、`commands/change`、`credentials/updated`�
 - 事件**签名**不另立表：owner 包把自己的 cordis `Events` 声明搬进 client-safe 的 `./types` 纯类型出口，两侧读**同一份**——`$on` 的 listener 类型就是 `Events[Event]` 本身。「原样」不需要证明，是构造性成立的。
 - 但**只借 cordis 的类型形状，不接 cordis 的事件系统**：投递语义、注册表、异常处置全归 Typert 自己。
 
-一条 `Events` 条目若签名里够到了 host-only 符号（Service、`Agent`、Context 等），处理方式是**把代码拆到能干净落进 `./types` 为止**；不接受「一半留 index、一半搬走」的分裂声明，也不接受在 `./types` 里造结构等价的影子类型。这五个包都不需要拆：它们的条目只够到纯类型。agent-presets 把原词汇模块改名为 `preset.ts`，让导出的 `types.ts` 专门承载 client-safe 事件声明。
+一条 `Events` 条目若签名里够到了 Host-only 符号（Service、`Agent`、Context 等），处理方式是**把代码拆到能干净落进 `./types` 为止**；不接受「一半留 index、一半搬走」的分裂声明，也不接受在 `./types` 里造结构等价的影子类型。这六个包都不需要拆：它们的条目只够到 `SettingsNamespace`、`CredentialRef`、`SessionId` 和 `BrowserCommand` 等 Client-safe 值。agent-presets 导出的 `types.ts` 专门承载其 Client-safe 事件声明。
 
-五条事件全部走这条路径，专用帧与 Client 别名都已删除。模型消费方直接订阅 `llm/adapters-updated` 和 `settings/document-updated`；preset 消费方订阅 `agent-preset/selected`。真正需要投影或去重的数据仍保留专用帧。
+六条事件全部走这条路径。前五条事件的专用帧与 Client 别名都已删除，浏览器扩展提供方则直接订阅 `browser/command`。模型消费方直接订阅 `llm/adapters-updated` 和 `settings/document-updated`；preset 消费方订阅 `agent-preset/selected`。真正需要投影或去重的数据仍保留专用帧。
 
 `skills/change`、`tools/change`、`system-prompt/change` 是同形状的纯失效事件但目前**没有任何消费者**，按「每个抽象都要有当前 owner 与需求」不进名单，只作为扩展位记录在此。
 
@@ -74,6 +74,7 @@ $dispatch(event: string, args: readonly unknown[]): void
 // remote-events.ts — the value
 export const API_REMOTE_FORWARDED_EVENTS = [
   'agent-preset/selected',
+  'browser/command',
   'commands/change',
   'credentials/updated',
   'llm/adapters-updated',
@@ -129,13 +130,13 @@ zod 侧 `args: z.array(z.unknown())`：帧本身来自 `JSON.parse`，元素必�
 |---|---|
 | `dsh-typert-protocol` | `src/types.ts` 加 `TypertForwardableEvent`、`TypertRemoteEventSelection`、`TypertRemoteEvent`；`TypertClientRemote` 增 `$on` 与 `$dispatch`。纯类型，零运行时 |
 | `api/gateway` client 半 | `ClientRemoteService` 实现 `$on`（订阅按注册项寻址、`ctx.effect` 归属调用方 fiber）与 `$dispatch`（快照后按注册顺序派发，收容抛出或拒绝的 listener） |
-| `api/remotes` | 新增 `src/remote-events.ts`（名单值）与 `src/types.ts`（类型投影 + 选择座位），两者都双列进两个 face 的 `files`；`./types` 出口 + `files` 补 `lib/types/**/*.js`；host 半加形状断言并 `import type {}` 三个 owner 包的 `./types`；client 半 `export type {}` 那三个 `./types` 与 `@deepseek-ai/dsh-api-gateway/client` |
+| `api/remotes` | `src/remote-events.ts` 负责允许名单值，`src/types.ts` 负责类型投影与选择座位；两者都属于两个编译面。Host 面导入六个 owner 的 `./types` 声明用于形状断言，Client 半则重新导出这些 Client-safe 类型与 `@deepseek-ai/dsh-api-gateway/client` |
 | 根 `tsconfig.base.json` | 加 `dsh-settings/types`、`dsh-credentials/types`、`dsh-api-remotes/types` 三条 `paths`，全部指向**源**平面 |
 | `dsh-commands` / `dsh-settings` / `dsh-credentials` | `interface Events` 子块移入各自 client-safe 的 `./types`（settings/credentials 新建该出口，brand 与纯类型一并移入，index 继续 re-export 并留住构造器；`files` 补 `lib/types/**/*.js`） |
 | `host/apiproxy` | `HostFrame` 增 `host/remote-event`、删除五个专用变体及其 zod；`events.host()` 按名单挂监听并通过 `assertJsonArgs` 校验 |
 | `dsh-session` | `src/types.ts` 补 `export type { JsonValue }`，让 wire 契约文件能走 client-safe 子路径 |
 | `client/runtime` | 五条 Client 事件桥分支收敛为 `ctx.remote.$dispatch(frame.event, frame.args)`，并删除重复声明 |
-| 5 个消费者 | ui-commands / ui-settings-models / ui-settings-general / ui-permission / ui-agent-preset 改订 `ctx.remote.$on(...)`；照 `ui-goal` 先例 type-only 引 `@deepseek-ai/dsh-api-remotes/client` 并把 `'remote'` 加进 `inject` |
+| 8 个消费方 | ui-commands / ui-model-selection / ui-settings-models / ui-settings-general / ui-permission / ui-agent-preset / ui-skill / client-browser-extension 通过 `ctx.remote.$on(...)` 订阅；沿用 `ui-goal` 的 type-only facade import 与 `'remote'` 注入先例 |
 | `client/connection` | fixture 的 `emitHost` 造 `host/remote-event` |
 | `apps/web/tests` + `apps/cli` | 客户端符号镜像（见上节）；`apps/cli/tsconfig.json` 删 15 条 client 工程引用 |
 
@@ -163,7 +164,7 @@ zod 侧 `args: z.array(z.unknown())`：帧本身来自 `JSON.parse`，元素必�
 - `$on` 的 disposer 归属调用方 fiber；同一个函数对象订阅两次时两条注册各自独立退订——按 listener 身份做键的表会把它们合并，所以订阅按注册项寻址。
 - 投递同时收容抛出的 listener 与拒绝所返回 promise 的 listener：声明返回值是 `void`，没人 await 异步 listener，其拒绝否则会完全逃出这层收容。投递遍历快照，因此派发中订阅或退订都不会改变本帧的接收者集合。
 - `assertJsonArgs` 直接单测，而不是从事件总线造畸形 emit：类型化的 `ctx.emit` 造不出来——名单内每条事件的载荷在静态上都是 JSON-safe 的。
-- 五个专用帧、五条 Client 别名及其桥分支都不存在；各消费方直接观察 owner 事件。
+- 五个专用帧、五条 Client 别名及其桥分支都不存在；各消费方直接观察 owner 事件，浏览器扩展接收定向 `browser/command` 载荷。
 
 ## 后果
 

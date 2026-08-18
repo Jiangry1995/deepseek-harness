@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import LlmRuntime, {
   errorChain,
@@ -91,6 +91,44 @@ const SCRIPT: StreamChunk[] = [
   { type: 'block-end', index: 0, block: { type: 'text', text: 'hi' } },
   { type: 'finish', reason: { kind: 'stop' } },
 ]
+
+/** One image-bearing request shared by the image-input resolution tests. */
+function imageRequest(provider: string): GenerateOptions {
+  return {
+    provider,
+    model: 'model',
+    messages: [createMessage({
+      role: 'user',
+      content: [{
+        type: 'image',
+        attachment: {
+          attachmentId: `sha256:${'a'.repeat(64)}` as never,
+          mediaType: 'image/png',
+          bytes: 68,
+          width: 1,
+          height: 1,
+        },
+      }],
+      source: { kind: 'user' },
+    })],
+  }
+}
+
+/** Adapter whose exact-model metadata declares one selected modality state. */
+class ModalityAdapter extends RecordingAdapter {
+  constructor(private readonly inputModalities: LlmResolvedModelInfo['inputModalities']) {
+    super(SCRIPT)
+  }
+
+  override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+    return Promise.resolve({
+      provider,
+      id: model,
+      name: model,
+      ...this.inputModalities === undefined ? {} : { inputModalities: this.inputModalities },
+    })
+  }
+}
 
 async function collect(stream: AsyncIterable<StreamChunk>): Promise<StreamChunk[]> {
   const chunks: StreamChunk[] = []
@@ -952,6 +990,93 @@ describe('LlmRuntime', () => {
     const reason = new Error('cancel reasoning')
     controller.abort(reason)
     await expect(resolving).rejects.toBe(reason)
+  })
+
+  it('leaves native image models on their adapter path without consulting the fallback', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    const adapter = new ModalityAdapter(['text', 'image'])
+    const fallback = {
+      available: vi.fn(() => Promise.resolve(true)),
+      project: vi.fn(() => Promise.resolve([])),
+    }
+    ctx.llm.registerAdapter(['vision'], adapter)
+    ctx.llm.registerImageFallback(fallback)
+    const request = imageRequest('vision')
+
+    await collect(ctx.llm.stream(request))
+
+    await expect(ctx.llm.resolveImageInput('vision', 'model')).resolves.toEqual({ kind: 'native' })
+    expect(fallback.available).not.toHaveBeenCalled()
+    expect(fallback.project).not.toHaveBeenCalled()
+    expect(adapter.lastOptions?.messages).toEqual(request.messages)
+  })
+
+  it('projects images before dispatch when the exact model is text-only and fallback is available', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    const adapter = new ModalityAdapter(['text'])
+    const projected = [createMessage({
+      role: 'user',
+      content: [{ type: 'text', text: 'durable image transcription' }],
+      source: { kind: 'plugin', plugin: 'vision-test' },
+    })]
+    const fallback = {
+      available: vi.fn(() => Promise.resolve(true)),
+      project: vi.fn(() => Promise.resolve(projected)),
+    }
+    ctx.llm.registerAdapter(['text'], adapter)
+    ctx.llm.registerImageFallback(fallback)
+
+    await expect(ctx.llm.resolveImageInput('text', 'model')).resolves.toEqual({ kind: 'fallback' })
+    await collect(ctx.llm.stream(imageRequest('text')))
+
+    expect(fallback.available).toHaveBeenCalledTimes(2)
+    expect(fallback.project).toHaveBeenCalledTimes(1)
+    expect(adapter.lastOptions?.messages).toEqual(projected)
+    expect(Object.isFrozen(adapter.lastOptions?.messages)).toBe(true)
+  })
+
+  it('does not infer missing modality metadata as a need for fallback', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    const adapter = new ModalityAdapter(undefined)
+    const fallback = {
+      available: vi.fn(() => Promise.resolve(true)),
+      project: vi.fn(() => Promise.resolve([])),
+    }
+    ctx.llm.registerAdapter(['unknown'], adapter)
+    ctx.llm.registerImageFallback(fallback)
+    const request = imageRequest('unknown')
+
+    await expect(ctx.llm.resolveImageInput('unknown', 'model')).resolves.toEqual({ kind: 'unknown' })
+    await collect(ctx.llm.stream(request))
+
+    expect(fallback.available).not.toHaveBeenCalled()
+    expect(fallback.project).not.toHaveBeenCalled()
+    expect(adapter.lastOptions?.messages).toEqual(request.messages)
+  })
+
+  it('restores unsupported image handling when the fallback is unavailable or disposed', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    const adapter = new ModalityAdapter(['text'])
+    const fallback = {
+      available: vi.fn(() => Promise.resolve(false)),
+      project: vi.fn(() => Promise.resolve([])),
+    }
+    ctx.llm.registerAdapter(['text'], adapter)
+    const dispose = ctx.llm.registerImageFallback(fallback)
+    const request = imageRequest('text')
+
+    await expect(ctx.llm.resolveImageInput('text', 'model')).resolves.toEqual({ kind: 'unsupported' })
+    await collect(ctx.llm.stream(request))
+    expect(fallback.project).not.toHaveBeenCalled()
+    expect(adapter.lastOptions?.messages).toEqual(request.messages)
+
+    dispose()
+    await expect(ctx.llm.resolveImageInput('text', 'model')).resolves.toEqual({ kind: 'unsupported' })
+    expect(() => ctx.llm.registerImageFallback(fallback)).not.toThrow()
   })
 
   it.each([0, -1, 1.5, Number.NaN])(

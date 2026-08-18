@@ -108,6 +108,7 @@ New behavior attaches to a documented extension point. Changing the loop itself 
 | Goal | Mechanism |
 |---|---|
 | Add a model provider | register its adapter on `ctx.llm` |
+| Add automatic image-to-text fallback for explicit text-only models | register the sole `LlmImageFallback` on `ctx.llm`; record auxiliary input and replacement text in the session |
 | Add a model-facing capability | register on `ctx.tools`; its schema joins prompt assembly |
 | Give one session a different capability set | compose an agent preset; a service row there needs an `isolate` realm |
 | Add shell execution | register a `ctx.shell` backend; the local one spawns through `ctx.subprocess` |

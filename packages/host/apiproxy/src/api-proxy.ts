@@ -74,6 +74,8 @@ import type {} from '@deepseek-ai/dsh-commands'
 // merges `ctx.dynamicCordisRunner`, and a dependency on that package would
 // rebuild the api-remotes cycle this direction exists to avoid.
 import type {} from '@deepseek-ai/dsh-cordis-host-runner/types'
+// Type-only: resolves the browser command event forwarded by api-remotes.
+import type {} from '@deepseek-ai/dsh-browser/types'
 import type {} from '@deepseek-ai/dsh-skill'
 // The settings/credentials seams: brand guards run at this wire boundary; the
 // service reads stay optional (`ctx.get`) so a composition without either
@@ -115,7 +117,7 @@ const DEFAULT_MAX_MESSAGES = 50
 
 /**
  * Non-model settings namespaces intentionally served to the Web client. The
- * plugin-owned entries (`agent-loop`, `bash`, `web-search-deepseek`) are the
+ * plugin-owned entries (`agent-loop`, `llm-vision-fallback`, `shell`, `web-search-deepseek`) are the
  * host-plane sections the plugin configuration page edits; a namespace absent
  * here answers `settings-not-exposed` even when its owner registered it, so
  * adding a section to that page is a decision made here rather than by the
@@ -124,7 +126,8 @@ const DEFAULT_MAX_MESSAGES = 50
  * is deferred work.
  */
 const WEB_SETTINGS_NAMESPACES = [
-  'agent-loop', 'shell', 'locale', 'permission', 'ui-conversation', 'ui-theme', 'web-search-deepseek',
+  'agent-loop', 'llm-vision-fallback', 'shell', 'locale', 'permission', 'ui-conversation', 'ui-theme', 'web-search-deepseek',
+  'web-search-tavily', 'web-search-firecrawl',
 ] as const
 
 /** Provider work budget: at most 100 calls and 2,000 inspected hits. */
@@ -353,6 +356,9 @@ async function buildModelCatalog(ctx: Context): Promise<{
           name: model.name,
           ...model.description === undefined ? {} : { description: model.description },
           ...reasoning === undefined ? {} : { reasoning },
+          ...resolved.inputModalities === undefined
+            ? {}
+            : { inputModalities: [...resolved.inputModalities] },
         }
       }))
       const group: ModelProviderGroup = {
@@ -1925,6 +1931,15 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     return { code: 'internal', message: 'credentials service is absent: this deployment does not mount a credential provider (e.g. @deepseek-ai/dsh-credentials-local) in its composition', details: {} }
   }
 
+  /** Missing-service report shared by the web probe surface. */
+  function webAbsent(): RpcError {
+    return {
+      code: 'internal',
+      message: 'web service is absent: this deployment does not mount @deepseek-ai/dsh-web in its composition',
+      details: {},
+    }
+  }
+
   /** Map one redacted settings descriptor to its wire view. */
   function namespaceView(descriptor: SettingsDescriptor): SettingsNamespaceView {
     return {
@@ -2295,11 +2310,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             const pendingImage = [...found.agent.inbox.nextTurn, ...found.agent.inbox.nextStep]
               .some(message => contentHasImage(message.content))
             if (pendingImage || messagesHaveImage(found.agent.session.deriveMessages())) {
-              const info = await ctx.llm.resolveModelInfo(resolved.provider, resolved.model)
-              if (info.inputModalities !== undefined && !info.inputModalities.includes('image')) {
+              const imageInput = await ctx.llm.resolveImageInput(resolved.provider, resolved.model)
+              if (imageInput.kind === 'unsupported') {
                 return err(request, {
                   code: 'model-unavailable',
-                  message: `Model "${resolved.model}" does not accept image input, but this session already contains images; select an image-capable model.`,
+                  message: `Model "${resolved.model}" does not accept image input, but this session already contains images; select an image-capable model or configure automatic vision.`,
                   details: { provider, model },
                 })
               }
@@ -2484,11 +2499,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           try {
             if (hasImage) {
               const current = selectionFor(agent).current
-              const modelInfo = await ctx.llm.resolveModelInfo(current.provider, current.model)
-              if (modelInfo.inputModalities !== undefined && !modelInfo.inputModalities.includes('image')) {
+              const imageInput = await ctx.llm.resolveImageInput(current.provider, current.model)
+              if (imageInput.kind === 'unsupported') {
                 return err(request, {
                   code: 'attachment-error',
-                  message: `Model "${current.model}" does not support image input.`,
+                  message: `Model "${current.model}" does not support image input and no automatic vision fallback is available.`,
                   details: { reason: 'MODEL_DOES_NOT_SUPPORT_IMAGES' },
                 })
               }
@@ -3421,6 +3436,33 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             code: 'model-discovery-failed',
             message: error instanceof Error ? error.message : String(error),
             details: { settingsNs, ...baseURL === undefined ? {} : { baseURL } },
+          })
+        }
+      },
+    },
+
+    web: {
+      async probeSearch(request, signal) {
+        // Optional composition: deployments without @deepseek-ai/dsh-web have no
+        // probe. Duck-typed to avoid a Host→web source edge (rootDir).
+        const web = ctx.get('web') as undefined | {
+          probeSearch(
+            providerId: string,
+            signal?: AbortSignal,
+          ): Promise<{ providerId: string; sourceCount: number }>
+        }
+        if (web === undefined) return err(request, webAbsent())
+        const { providerId } = request.payload
+        try {
+          const result = await web.probeSearch(providerId, signal)
+          return ok(request, result)
+        } catch (error: unknown) {
+          // A refused key, unreachable endpoint, or unregistered provider is
+          // the configuration surface's next move — not a transport fault.
+          return err(request, {
+            code: 'web-probe-failed',
+            message: error instanceof Error ? error.message : String(error),
+            details: { providerId },
           })
         }
       },

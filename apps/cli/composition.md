@@ -102,6 +102,8 @@ flowchart LR
   cfg --> plugin_dsh_base_command_goal
   plugin_dsh_base_plan_mode["plan-mode<br/>@deepseek-ai/dsh-plan-mode"]
   cfg --> plugin_dsh_base_plan_mode
+  plugin_dsh_base_web_networking["web-networking<br/>@deepseek-ai/dsh-web-networking"]
+  cfg --> plugin_dsh_base_web_networking
   plugin_dsh_base_token_meter["token-meter<br/>@deepseek-ai/dsh-token-meter"]
   cfg --> plugin_dsh_base_token_meter
   plugin_dsh_base_compaction_basic["compaction-basic<br/>@deepseek-ai/dsh-compaction-basic"]
@@ -152,6 +154,10 @@ flowchart LR
   cfg --> plugin_dsh_base_web
   plugin_dsh_base_web_search_deepseek["web-search-deepseek<br/>@deepseek-ai/dsh-web-search-deepseek"]
   cfg --> plugin_dsh_base_web_search_deepseek
+  plugin_dsh_base_web_search_tavily["web-search-tavily<br/>@deepseek-ai/dsh-web-search-tavily"]
+  cfg --> plugin_dsh_base_web_search_tavily
+  plugin_dsh_base_web_search_firecrawl["web-search-firecrawl<br/>@deepseek-ai/dsh-web-search-firecrawl"]
+  cfg --> plugin_dsh_base_web_search_firecrawl
   plugin_dsh_base_tool_web["tool-web<br/>@deepseek-ai/dsh-tool-web"]
   cfg --> plugin_dsh_base_tool_web
   plugin_dsh_base_tools["tools<br/>@deepseek-ai/dsh-tools"]
@@ -215,6 +221,7 @@ flowchart LR
 | `goal-round-driver` | `@deepseek-ai/dsh-goal-round-driver` |
 | `command-goal` | `@deepseek-ai/dsh-command-goal` |
 | `plan-mode` | `@deepseek-ai/dsh-plan-mode` |
+| `web-networking` | `@deepseek-ai/dsh-web-networking` |
 | `token-meter` | `@deepseek-ai/dsh-token-meter` |
 | `compaction-basic` | `@deepseek-ai/dsh-compaction-basic` |
 | `command-compact` | `@deepseek-ai/dsh-command-compact` |
@@ -240,6 +247,8 @@ flowchart LR
 | `repeat-tool-reminder` | `@deepseek-ai/dsh-repeat-tool-reminder` |
 | `web` | `@deepseek-ai/dsh-web` |
 | `web-search-deepseek` | `@deepseek-ai/dsh-web-search-deepseek` |
+| `web-search-tavily` | `@deepseek-ai/dsh-web-search-tavily` |
+| `web-search-firecrawl` | `@deepseek-ai/dsh-web-search-firecrawl` |
 | `tool-web` | `@deepseek-ai/dsh-tool-web` |
 | `tools` | `@deepseek-ai/dsh-tools` |
 | `system-prompt` | `@deepseek-ai/dsh-system-prompt` |

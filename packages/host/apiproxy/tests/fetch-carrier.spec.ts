@@ -282,6 +282,15 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
         return { rpcId: request.rpcId, result: { ok: true, value: { models: [] } } }
       },
     },
+    web: {
+      /** Return a deterministic provider probe for carrier-focused tests. */
+      async probeSearch(request) {
+        return {
+          rpcId: request.rpcId,
+          result: { ok: true, value: { providerId: request.payload.providerId, sourceCount: 1 } },
+        }
+      },
+    },
     events: {
       mux: (_request, signal) => stream(muxFrames, signal),
       host: (_request, signal) => stream(hostFrames, signal),

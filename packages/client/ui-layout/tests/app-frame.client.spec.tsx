@@ -120,6 +120,9 @@ beforeEach(() => {
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => setTimeout(() => { cb(0) }, 16) as unknown as number)
   vi.stubGlobal('cancelAnimationFrame', (h: number) => { clearTimeout(h) })
   window.innerWidth = frameWidth
+  const url = new URL(window.location.href)
+  url.search = ''
+  window.history.replaceState({}, '', url)
   Element.prototype.getBoundingClientRect = function () {
     return { width: frameWidth, height: 1080, top: 0, left: 0, right: frameWidth, bottom: 1080, x: 0, y: 0, toJSON: () => ({}) }
   }
@@ -394,5 +397,57 @@ describe('AppFrame — unmount with an in-flight resize frame', () => {
     frameWidth = 1250
     act(() => { fireResize?.(); fireResize?.(); vi.advanceTimersByTime(20) })
     expect(tracks(frame)).toEqual([280, 330])
+  })
+})
+
+describe('AppFrame — side-panel surface', () => {
+  /** Tag the page as the Chrome side-panel iframe before the frame mounts. */
+  function markSidePanel(): void {
+    const url = new URL(window.location.href)
+    url.searchParams.set('dsh-surface', 'side-panel')
+    window.history.replaceState({}, '', url)
+  }
+
+  it('drops the rail and details track even on a wide viewport', () => {
+    markSidePanel()
+    const { frame, slotCalls, instance, getByTestId } = mountFrame()
+    expect(frame.getAttribute('data-surface')).toBe('side-panel')
+    expect(tracks(frame)).toEqual([0, 0])
+    expect(frame.hasAttribute('data-sidebar-collapsed')).toBe(false)
+    expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(0)
+    expect(slotCalls.filter(c => c.key === 'sidebar').at(-1)!.props).toEqual({
+      collapsed: false,
+      width: 0,
+      surface: 'side-panel',
+    })
+    act(() => { instance.actions.openDetails() })
+    expect(tracks(frame)).toEqual([0, 0])
+    // In-flow order must stay sidebar | conversation | details. A fixed
+    // sidebar column would skip auto-placement and give details the 1fr track.
+    expect(getByTestId('center-content').parentElement).toBe(frame.children[1])
+    expect(getByTestId('details-content').parentElement).toBe(frame.children[2])
+  })
+
+  it('does not fall back to the collapsed rail on a narrow side-panel iframe', () => {
+    markSidePanel()
+    frameWidth = 400
+    const { frame, slotCalls } = mountFrame()
+    expect(tracks(frame)).toEqual([0, 0])
+    expect(slotCalls.filter(c => c.key === 'sidebar').at(-1)!.props).toEqual({
+      collapsed: false,
+      width: 0,
+      surface: 'side-panel',
+    })
+  })
+
+  it('leaves a narrow desktop window on the compact rail', () => {
+    frameWidth = 400
+    const { frame, slotCalls } = mountFrame()
+    expect(frame.hasAttribute('data-surface')).toBe(false)
+    expect(tracks(frame)).toEqual([SIDEBAR_COLLAPSED, 0])
+    expect(slotCalls.filter(c => c.key === 'sidebar').at(-1)!.props).toEqual({
+      collapsed: true,
+      width: SIDEBAR_COLLAPSED,
+    })
   })
 })

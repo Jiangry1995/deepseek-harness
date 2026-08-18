@@ -36,8 +36,9 @@ export interface CardFieldSpec {
 
 /**
  * A control whose value is written outside the settings section. A credential
- * literal never rides a response, so its draft has nothing to seed from: it is
- * blank until typed, and a blank draft writes nothing.
+ * literal never rides a response, so the Host cannot seed the control: what the
+ * user typed (and what a successful save kept on screen) is the only text it
+ * shows.
  */
 export interface CardSecretSpec {
   /** Field name addressing this control inside the card's form. */
@@ -156,6 +157,11 @@ export class CardForm<T> {
   private readonly specs: Map<string, CardFieldSpec>
   private readonly secretSpecs: Map<string, CardSecretSpec>
   private readonly staged = new Map<string, StagedEdit>()
+  /**
+   * Last secret literal a save successfully wrote. Shown after the staged
+   * draft is cleared so "what you wrote" stays on screen without staying dirty.
+   */
+  private readonly secretKept = new Map<string, string>()
   private readonly listeners = new Set<() => void>()
   private saving = false
   private failed = false
@@ -211,7 +217,11 @@ export class CardForm<T> {
   field(field: string): CardFieldState {
     const staged = this.staged.get(field)
     if (this.secretSpecs.has(field)) {
-      return { text: staged?.text ?? '', overridden: false, invalid: false }
+      return {
+        text: staged?.text ?? this.secretKept.get(field) ?? '',
+        overridden: false,
+        invalid: false,
+      }
     }
     const spec = this.spec(field)
     if (staged === undefined) {
@@ -252,18 +262,28 @@ export class CardForm<T> {
    * validators own the constraints no schema can express — so the outcome is
    * read back from the section rather than predicted here. A save that did not
    * land keeps its drafts, so the user can correct them instead of retyping.
+   * Accepted secrets keep their literal on screen (not as a dirty draft).
    * @returns settlement after every write and the read-back.
    */
   async save(): Promise<void> {
     const plan = this.plan()
-    const writes = plan.flatMap(item => item.run === undefined ? [] : [item.run])
+    const writes = plan.flatMap((item) => {
+      const run = item.run
+      return run === undefined ? [] : [{ field: item.field, run }]
+    })
     if (plan.length === 0 || this.saving || writes.length !== plan.length) return
     this.saving = true
     this.failed = false
     this.publish()
     let landed = true
-    for (const write of writes) {
-      landed = await write() && landed
+    for (const item of writes) {
+      const ok = await item.run()
+      landed = ok && landed
+      if (ok && this.secretSpecs.has(item.field)) {
+        const written = this.staged.get(item.field)?.text.trim() ?? ''
+        if (written !== '') this.secretKept.set(item.field, written)
+        this.staged.delete(item.field)
+      }
     }
     if (landed) this.staged.clear()
     this.saving = false
@@ -283,7 +303,10 @@ export class CardForm<T> {
       const secret = this.secretSpecs.get(field)
       if (secret !== undefined) {
         const value = staged.text.trim()
-        if (value !== '') plan.push({ field, run: () => secret.write(value) })
+        // Blank means "leave the Host key alone"; same as last kept write is
+        // already on the Host and must not dirty the card again.
+        if (value === '' || value === this.secretKept.get(field)) continue
+        plan.push({ field, run: () => secret.write(value) })
         continue
       }
       const spec = this.spec(field)

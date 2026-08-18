@@ -46,6 +46,32 @@
   white-space: nowrap;
 }
 
+.triggerLabelCompact {
+  display: none;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:global([data-surface='side-panel']) .root {
+  width: 100%;
+}
+
+:global([data-surface='side-panel']) .trigger {
+  max-width: none;
+  width: 100%;
+}
+
+:global([data-surface='side-panel']) .triggerLabel {
+  display: none;
+}
+
+:global([data-surface='side-panel']) .triggerLabelCompact {
+  display: block;
+  flex: 1;
+}
+
 /* Effort value beside the model name (mock's 'High': same 13/20/500, caption tone). */
 .triggerEffort {
   flex: 0 0 auto;

@@ -76,6 +76,21 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+/* Desktop keeps the hover-reveal clock. Plugin chrome folds the same facts
+   into the question mark so the row does not jump on hover. */
+.statsHint {
+  display: none;
+}
+
+:global([data-surface='side-panel']) .statsHint {
+  display: inline-flex;
+}
+
+:global([data-surface='side-panel']) .timeStart,
+:global([data-surface='side-panel']) .timeEnd {
+  display: none;
+}
+
 .visuallyHidden {
   position: absolute;
   width: 1px;

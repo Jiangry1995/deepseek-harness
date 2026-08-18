@@ -24,7 +24,9 @@ DeepSeek Harness 使用同一原语，使项目特定的评审、插件编写和
 
 本地 skill 的文件系统 I/O 在加载了文件系统服务时通过 `ctx.fs` 进行：项目根目录查找使用 `resolve` 和 `stat` 探测 `.git`，根目录发现使用 `listDir`，skill 读取使用 `readText`。Node 文件系统作为后备，供在不挂载 fs seam 的最小上下文中加载 `dsh-skill-filesystem` 时使用。缺失的根目录、不可读或格式错误的 skill 文件、以及提供方 `list()` 的瞬态失败均降级为警告并跳过，使一个坏源不会导致所有 agent 请求失败；格式错误的候选项仍然快速失败，因为它们违反了提供方约定。
 
-`dsh-tool-skill` 在会话的第一个 `agent/pre-step` 注入一个持久化的 user-role `<system-reminder>` 目录，作为带来源的 `user/message`，且仅当该 agent 的工具视图解析到本插件精确的 `skill` 注册时才注入。该目录仅包含排序后的 skill 名称与描述；不包含正文、路径、来源、提供方和路由提示。描述经过空白规范化、XML 转义，并受 `catalogDescriptionMaxLength` 上限约束，其默认值为 `500`，最小值为 `3`。完整的 skill 正文从不包含在目录中。（目录最初通过仅请求的[会话前缀扩展点](../../archived/feature/2026-07-07-session-prefix.md)（已归档）传递；[统一带来源消息的决策](../architecture/2026-07-22-unified-send-and-coalesced-user-messages.md)将其移入持久化历史。）
+`dsh-tool-skill` 在会话的第一个 `agent/pre-step` 注入一个持久化的 user-role `<system-reminder>` 目录，作为带来源的 `user/message`，且仅当该 agent 的工具视图解析到本插件精确的 `skill` 注册时才注入。该目录仅包含排序后的 skill 名称与描述；不包含正文、路径、来源、提供方和路由提示。描述经过空白规范化、XML 转义，并受 `catalogDescriptionMaxLength` 上限约束，其默认值为 `500`，最小值为 `3`。其来源会在条目旁记录 `routingRevision`，digest 也包含该修订版本，因此即使可用 skill 没有变化，模型选择规则发生变化时仍可替换已恢复会话中的旧目录。历史消息未记录修订版本时按零处理。完整的 skill 正文从不包含在目录中。（目录最初通过仅请求的[会话前缀扩展点](../../archived/feature/2026-07-07-session-prefix.md)（已归档）传递；[统一带来源消息的决策](../architecture/2026-07-22-unified-send-and-coalesced-user-messages.md)将其移入持久化历史。）
+
+目录会把用户显式点名的 skill 设为必须加载。用户没有点名时，模型先推断请求结果和执行环境，再选择能在该环境中直接执行的能力；只有所选路径需要某个 skill 的指令时才加载它。共享主题、网站或数据源，不会让 skill 凌驾于能够完成请求效果的直接工具。
 
 注册表的 `list()` 返回全部胜出摘要，而模型与用户消费方应用[独立调用策略决策](2026-07-28-skill-invocation-policy.md)定义的调用判定。`skill({ name })` 工具为当前 agent cwd 加载一个模型可调用的 skill，返回包含 `<skill_content name="...">`、`<skill_resources>` 和 `<skill_instructions>` 的工具结果。`resourceBase` 提供一个目录、URL 或不透明的提供方管理的基路径，用于显式引用的脚本、参考资料和资产；资源仅按需加载，不进行目录枚举。无法解析的名称报告该 skill 未知或不再可用；无效名称和 `invocation.modelInvocable` 为 `false` 的 skill 保留不同的工具错误。工具结果是面向模型的可见披露路径。
 
@@ -35,6 +37,8 @@ DeepSeek Harness 使用同一原语，使项目特定的评审、插件编写和
 **将完整 skill 正文注入每条系统提示词。** 否决，因为这破坏了渐进式披露，使每个请求都为可能不适用的指令付出代价。
 
 **仅以斜杠命令暴露 skill。** 否决，因为模型主动加载是核心能力；面向人类的命令广播不改变发现机制。
+
+**加载描述与任务主题相同的每个 skill。** 否决，因为描述既可以覆盖领域，也可以覆盖流程。把主题相似视为优先级，会把操作从用户选择的执行环境转移出去，并为所选能力不需要的指令支付加载成本。
 
 **将本地文件系统扫描直接放入 `ctx.skills`。** 否决，因为编码 agent、Web agent 和未来的插件生态需要不同的 skill 来源。提供方注册表与 subagent seam 镜像：注册表拥有冲突解决和消费方，实现负责加载。
 

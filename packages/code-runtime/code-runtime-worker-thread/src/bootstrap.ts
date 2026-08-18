@@ -260,6 +260,14 @@ function bindingFailure(errorClass: BindingErrorConstructor | undefined, memberN
 }
 
 /**
+ * Normalize one program-side binding argument before the lossless-JSON snapshot.
+ * `tools.foo()` and `tools.foo(undefined)` both become `{}`.
+ */
+function normalizeBindingArgs(args: unknown): unknown {
+  return args === undefined ? {} : args
+}
+
+/**
  * Build each declared error class once so calls and `instanceof` share constructor identity.
  * @param data - binding namespace declarations from the boot payload.
  * @returns constructors keyed by their owning namespace global.
@@ -302,8 +310,10 @@ export function wireReplies(port: BootstrapPort, pending: Map<number, PendingCal
  * Build the binding namespace objects the program sees: one null-prototype global per
  * namespace, each declared name an own enumerable async function that bridges over the port
  * (`__proto__`/`constructor`/`toString` are ordinary keys, never prototype collisions).
- * Lossy arguments reject before posting; clone failures and host failure
- * replies reject only the corresponding call.
+ * Omitted or undefined arguments become `{}` before the snapshot so empty-
+ * parameter tools can be called as `tools.foo()`. Lossy arguments reject
+ * before posting; clone failures and host failure replies reject only the
+ * corresponding call.
  *
  * @param data - the boot payload's namespace declarations (globals + names).
  * @param port - the port binding calls are posted to.
@@ -328,7 +338,7 @@ export function makeNamespaces(
         value: (args: unknown): Promise<unknown> => {
           let detached: ReturnType<typeof snapshotCodeJsonValue>
           try {
-            detached = snapshotCodeJsonValue(args)
+            detached = snapshotCodeJsonValue(normalizeBindingArgs(args))
           } catch {
             detached = undefined
           }

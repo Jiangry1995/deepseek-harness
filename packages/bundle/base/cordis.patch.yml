@@ -278,6 +278,12 @@
 
               When ready, call exit_plan_mode with the complete plan markdown, starting with a # title. Make exit_plan_mode the only and final tool call in that assistant response: it presents the plan for approval, and implementation begins only in a later step after approval. Do not paste the final plan as a plain reply or ask "should I proceed?" through prose or ask_user_question. If review rejects it, incorporate the feedback and present again. If the review channel is unavailable or aborted, stay in plan mode and ask the user to switch modes manually; do not proceed with implementation.
 
+    # Session-scoped gate for inherited web_search / web_fetch (`/web`,
+    # `webNetworking` projection). Stays on the host plane: the command and
+    # projection are process-wide, while tools.restrict applies per agent.ctx.
+    - id: web-networking
+      name: '@deepseek-ai/dsh-web-networking'
+
     - id: token-meter
       name: '@deepseek-ai/dsh-token-meter'
 
@@ -397,10 +403,11 @@
     # resolves the same DEEPSEEK_API_KEY credential the Models page manages for
     # chat, at each search; its Messages endpoint is separate from the
     # chat-completions endpoint, so it takes its own base-URL override. Fetch stays
-    # disabled and no fetch provider is mounted: that provider defers SSRF
-    # protection and the model would choose the request target. Search is a full
-    # auxiliary model request with server-side retrieval, so this shipped DeepSeek
-    # route gets 60s while the provider-neutral tool default remains 30s.
+    # disabled in the shipped tool config because the model would choose the request
+    # target; the optional Firecrawl backend is mounted but remains unavailable until
+    # configured and selected. Search is a full auxiliary model request with
+    # server-side retrieval, so this shipped DeepSeek route gets 60s while the
+    # provider-neutral tool default remains 30s.
     - id: web
       name: '@deepseek-ai/dsh-web'
       config:
@@ -411,10 +418,23 @@
       config:
         apiKeyEnv: DEEPSEEK_API_KEY
 
+    # Optional third-party providers. They register stable backends but remain
+    # unavailable until their credential is configured; the profile still owns
+    # searchProvider/fetchProvider selection on the `web` row.
+    - id: web-search-tavily
+      name: '@deepseek-ai/dsh-web-search-tavily'
+      config:
+        apiKeyEnv: TAVILY_API_KEY
+
+    - id: web-search-firecrawl
+      name: '@deepseek-ai/dsh-web-search-firecrawl'
+      config:
+        apiKeyEnv: FIRECRAWL_API_KEY
+
     - id: tool-web
       name: '@deepseek-ai/dsh-tool-web'
       config:
-        fetch: false
+        fetch: true
         searchTimeoutMs: 60000
 
     # ── rows every mode mounts, whose values each overlay may state ──────────────

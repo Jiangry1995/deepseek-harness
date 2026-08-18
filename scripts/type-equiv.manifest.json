@@ -1341,6 +1341,31 @@
       "source": "packages/web/web/src/types.ts"
     },
     {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserTab",
+      "source": "packages/web/browser/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserOpenTabSpec",
+      "source": "packages/web/browser/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserOperation",
+      "source": "packages/web/browser/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserOperationResult",
+      "source": "packages/web/browser/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/browser.md",
+      "symbol": "BrowserClientLease",
+      "source": "packages/web/browser/src/types.ts"
+    },
+    {
       "doc": "docs/subsystems/spill.md",
       "symbol": "SaveTextSpill",
       "source": "packages/spill/spill/src/types.ts"

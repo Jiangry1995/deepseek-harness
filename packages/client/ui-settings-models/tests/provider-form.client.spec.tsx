@@ -166,6 +166,11 @@ function expandModel(index: number): void {
   fireEvent.click(screen.getByLabelText(`${en.modelAdvanced} ${index}`))
 }
 
+/** Candidate checkboxes inside the fetch-models dialog, not the image-input switches. */
+function candidateBoxes(): HTMLInputElement[] {
+  return [...screen.getByRole('dialog').querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]
+}
+
 /** The button carrying `label`, typed so its disabled/title state is readable. */
 function buttonNamed(label: string): HTMLButtonElement {
   const found = screen.getByText(label)
@@ -210,6 +215,40 @@ describe('model list editing', () => {
       ns: 'llm-pi-ai',
       expectedRevision: 3,
       ops: [{ op: 'set', path: ['providers', 'openai', 'models'], value: [{ id: 'acme-large', contextWindow: 65_536 }] }],
+    })
+  })
+
+  it('declares image input from the per-model switch and can take it back', async () => {
+    const { mutate } = await mountSection({
+      providers: {
+        openai: {
+          baseURL: 'https://proxy.example/v1',
+          models: [{ id: 'seeing', input: ['text', 'image'] }, { id: 'plain' }],
+        },
+      },
+    })
+    openEditor('openai')
+
+    const seeing = screen.getByLabelText<HTMLInputElement>(`${en.modelImageInput} 1`)
+    const plain = screen.getByLabelText<HTMLInputElement>(`${en.modelImageInput} 2`)
+    expect(seeing.checked).toBe(true)
+    expect(plain.checked).toBe(false)
+
+    fireEvent.click(plain)
+    fireEvent.click(seeing)
+    fireEvent.click(screen.getByText(en.apply))
+
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate)).toMatchObject({
+      ns: 'llm-pi-ai',
+      ops: [{
+        op: 'set',
+        path: ['providers', 'openai', 'models'],
+        value: [
+          { id: 'seeing', input: ['text'] },
+          { id: 'plain', input: ['text', 'image'] },
+        ],
+      }],
     })
   })
 
@@ -476,7 +515,7 @@ describe('endpoint interrogation', () => {
     fireEvent.click(screen.getByText(en.fetchModels))
     await screen.findByText(en.fetchTitle)
     // The already-configured row starts unchecked; the new one starts checked.
-    const boxes = [...document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]
+    const boxes = candidateBoxes()
     expect(boxes.map(box => box.checked)).toEqual([false, true])
     fireEvent.click(screen.getByText(en.fetchAdopt))
 
@@ -592,7 +631,7 @@ describe('endpoint interrogation', () => {
 
     fireEvent.click(screen.getByText(en.fetchModels))
     await screen.findByText(en.fetchTitle)
-    const boxes = [...document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]
+    const boxes = candidateBoxes()
     const first = boxes[0] as HTMLInputElement
     fireEvent.click(first)
     fireEvent.click(first)

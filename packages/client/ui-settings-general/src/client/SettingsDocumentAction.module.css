@@ -5,6 +5,11 @@
   gap: 8px;
 }
 
+.action :global(button) {
+  flex: none;
+  white-space: nowrap;
+}
+
 .error {
   max-width: 180px;
   overflow: hidden;

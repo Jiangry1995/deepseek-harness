@@ -1,0 +1,14 @@
+{
+  "extends": "../../../tsconfig.base.client.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "types": ["chrome"]
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    { "path": "../../api/remotes/tsconfig.client.json" },
+    { "path": "../runtime" },
+    { "path": "../../runtime-diagnostics/invariants" }
+  ]
+}

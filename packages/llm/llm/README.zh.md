@@ -20,6 +20,8 @@
 - `ctx.llm.providerRetryPolicy(provider: string): ResolvedRetryPolicy` 返回注册时捕获的提供方自身的重试策略，并解析 normal 默认值。
 - `ctx.llm.listModels(provider: string): Promise<LlmModelInfo[]>` 发现某个已注册提供方当前公布的模型。
 - `ctx.llm.resolveModelInfo(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>` 从拥有该精确路由的适配器中，解析并校验确切模型身份，以及可用上下文、输出默认值和推理（reasoning）元数据；异步适配器可选地支持取消。
+- `ctx.llm.registerImageFallback(fallback: LlmImageFallback): () => void` 注册进程内唯一、随 fiber 释放的图片转文本降级；重复注册以 `DUPLICATE_IMAGE_FALLBACK` 失败。
+- `ctx.llm.resolveImageInput(provider: string, model: string, signal?: AbortSignal): Promise<ImageInputResolution>` 将确切路由解析为 `native`、`fallback`、`unsupported` 或 `unknown`；模态元数据缺失时保持未知，绝不根据推断选择降级。
 - `ctx.llm.resolveCallConfig(config: LlmCallConfig, signal?: AbortSignal): Promise<LlmCallConfig>` 校验显式推理强度，并填入适配器配置的调用默认值，但不自动调整。
 - `ctx.llm.prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<PreparedLlmCall>` 在一次精确模型查询中解析配置、脱耦的上下文元数据以及标明哪些字段由适配器默认值填入的标记，再将当前适配器注册和不可变重试策略捕获为一次可取消、一次性调用。
 - `ctx.llm.stream(options: GenerateOptions): AsyncIterable<StreamChunk>` 将一次模型调用流式输出为原始分片（token 级增量）。消费方使用 `BlockAssembler` 将分片组装为块／消息。
@@ -32,7 +34,7 @@
 
 每个拓扑提交点——适配器路由注册或 dispose、目录条目出现或撤回——都会在变更之后发出无载荷的 `llm/adapters-updated` 事件，消费方因此会重新读取 `listProviders()`/`listModels()`/`listConfigurableProviders()`，而不是轮询。观察者故障会被记录并隔离，不能否决变更；只有带 `INVARIANT` 码的故障会在通知完所有观察者后重新抛出。
 
-确切模型元数据是独立的正确性查询，不是 catalog 装饰或全局 LLM 设置。`resolveModelInfo()` 会向拥有精确提供方／模型路由的适配器查询一次；适配器可以描述未列出的动态模型。缺少 `context` 表示模型容量未知；缺少 `defaultMaxTokens` 表示继续沿用提供方自身的输出默认值；缺少 `reasoning` 则表示推理能力不可用。无效的身份、上下文、输出默认值或推理元数据会以 `INVALID_MODEL_INFO`、`INVALID_MODEL_CONTEXT`、`INVALID_MODEL_MAX_TOKENS` 或 `INVALID_MODEL_REASONING` 失败。
+确切模型元数据是独立的正确性查询，不是 catalog 装饰或全局 LLM 设置。`resolveModelInfo()` 会向拥有精确提供方／模型路由的适配器查询一次；适配器可以描述未列出的动态模型。缺少 `context`、`defaultMaxTokens`、`reasoning` 或 `inputModalities` 分别表示容量未知、继续沿用提供方输出默认值、推理不可用或模态能力未知。无效的身份、上下文、输出默认值或推理元数据会以 `INVALID_MODEL_INFO`、`INVALID_MODEL_CONTEXT`、`INVALID_MODEL_MAX_TOKENS` 或 `INVALID_MODEL_REASONING` 失败。`resolveImageInput()` 会保留这种区别：原生图片声明优先，显式排除图片时才询问已安装降级，未知元数据继续由适配器拥有。
 
 `defaultMaxTokens` 是适配器配置的单次请求输出上限，不是模型硬上限。仅当请求省略 `maxTokens` 时，`resolveCallConfig()` 才会填入该值；显式上限优先。推理标识符是由适配器定义的不透明字符串，而非核心枚举：同一次解析只接受与已公布标识符完全一致的值，在存在 `defaultEffort` 时填入它，否则保留提供方默认值。异步模型解析器会接收调用方信号，并且必须在取消后尽快结算。`prepareCall()` 还会返回同一次查询得到的、与适配器内部状态分离的上下文元数据，通过 `adapterDefaults` 标明填入了哪些 `maxTokens` 和 `reasoningEffort` 字段，并在请求头记录和最终分发期间始终保留同一项精确的适配器注册。因此，HMR（热模块替换）不会把一个适配器的能力结果与另一个适配器的请求混用；复用其一次性句柄或更改调用配置字段会以 `INVALID_PREPARED_CALL` 失败。不支持的显式或配置推理强度会在提供方 I/O 前以 `UNSUPPORTED_REASONING_EFFORT` 失败。
 
@@ -51,7 +53,7 @@
 
 `Message` 是投递、持久历史和模型请求共享的不可变值。每条消息从创建起都必须具有 `MessageId`、角色、内容和带类型的来源。`createMessage(input)` 生成标识，并返回与输入分离且深度冻结的值；`createUserMessage({ content, source })` 固定 user 角色；`createAssistantMessage({ content, source })` 固定 assistant 角色与模型来源类别；`createToolResultMessage({ callId, content, isError })` 固定 user 角色，并将工具来源与其结果块耦合；`freezeMessage(message)` 导入已有标识，绝不将其替换。改写消息时会保留标识，并产生另一个冻结值。浏览器端代码会从依赖最少的 `@deepseek-ai/dsh-llm/message` 入口导入这些值构造函数，而不是从包含服务的包根入口导入。
 
-消息内容是类型化内容块数组：`text`、`reasoning`、`tool-call`、`tool-result`。联合从可合并扩展的 `ContentBlockMap` 派生，因此插件可以通过 declaration merging 添加块类型。assistant 消息使用模型来源，其中携带生成该消息的提供方和模型，以及可选的适配器私有回放状态。dispatch 前，`LlmRuntime` 只在历史提供方路由与目标提供方路由当前由完全相同的适配器实例拥有时才保留该状态；随后由适配器判定能否在模型／提供方间恢复或转换该状态。核心块集只包含每条已发布路径都支持的块。多模态内容（图像、音频等）没有核心块类型；需要它的功能会通过 map 添加，并一并添加相应的适配器／UI／压缩（compaction）支持。
+消息内容是类型化内容块数组：`text`、`reasoning`、`image`、`tool-call`、`tool-result`。联合从可合并扩展的 `ContentBlockMap` 派生，因此插件可以通过 declaration merging 添加块类型。assistant 消息使用模型来源，其中携带生成该消息的提供方和模型，以及可选的适配器私有回放状态。dispatch 前，`LlmRuntime` 只在历史提供方路由与目标提供方路由当前由完全相同的适配器实例拥有时才保留该状态；随后由适配器判定能否在模型／提供方间恢复或转换该状态。图片块携带持久附件引用；原生视觉适配器解析其字节，已注册的 `LlmImageFallback` 则只为明确排除图片输入的确切模型把它们替换为已记录文本。
 
 流式输出是原始分片协议（`block-start`、`text-delta`、`reasoning-delta`、`tool-call-delta`、`block-end`、`usage`、`finish`）。每个适配器结果都以一个终止 `finish` 到达消费方；运行故障使用 `error` 或 `aborted` 作为结束原因，而不会跨流 API 抛出。`BlockAssembler` 是将分片组装为块／消息的唯一共享实现。
 
@@ -85,11 +87,19 @@
 
 ## 模型体验
 
-无。服务不添加任何与模型绑定的文本、schema 或消息；它只会填入并记录适配器配置的推理强度。
+### 自动图片降级
+
+#### 模型看到什么
+
+当带图片调用的目标模型明确排除图片输入时，已注册的 `LlmImageFallback` 可以把图片替换为其持久文本投影。文本及其日志归提供方所有；原生视觉、能力未知以及无降级路由不会收到服务自有内容。
+
+#### Token 影响
+
+服务不添加固定 Token。降级提供方决定条件辅助请求，以及作为目标模型输入计费的替换文本。
 
 #### KV Cache 影响
 
-透传；注册表保留已组装请求前缀，cache 复用与路由边界属于所选适配器和提供方。
+原生视觉和能力未知路由保持透传。降级可以在目标适配器前把图片块替换为持久文本；由该提供方拥有最终的前缀行为。
 
 ## 已知限制与暂缓事项
 
@@ -99,3 +109,4 @@
 - **`BlockAssembler` 只处理核心块类型**：如果插件添加块类型的流从未由 `block-end` 关闭，`blocks()` 会抛出异常。
 - **`APP_IDENTITY.url` 指向一个尚不存在的仓库**：该公开主页必须在发布前可访问。
 - **`GenerateOptions.sessionId` 是本地声明的品牌类型**：导入 dsh-session 的 `SessionId` 会产生循环；未来拥有 id 的包可以消除该权宜之计。
+- **每个进程只能注册一个图片降级**：部署应通过组合替换注册插件，而不是叠加隐式 fallback 优先级。

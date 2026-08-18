@@ -117,3 +117,53 @@
 .overlayLayer > * {
   pointer-events: auto;
 }
+
+/* Chrome side-panel iframe: keep the three in-flow tracks (0 | 1fr | 0) so
+   conversation stays in the center column. Do not `position: fixed` the
+   sidebar cell — a fixed grid item drops out of auto-placement and the
+   details empty state inherits the 1fr track. Chrome/drawer pin themselves
+   to the viewport from inside SidePanelShell. */
+.frame[data-surface='side-panel'] {
+  --dsh-side-panel-chrome-height: 48px;
+  /* One token for 轨迹框→新建 and 新建→设置. Overlay cluster width is
+     icon + gap + icon; header padding-end is pad + that + the same gap. */
+  --dsh-side-panel-chrome-gap: 4px;
+  --dsh-side-panel-chrome-pad: 8px;
+  --dsh-side-panel-chrome-icon: 20px;
+  /* History icon + gap before the title. */
+  --dsh-side-panel-chrome-start: calc(
+    var(--dsh-side-panel-chrome-pad)
+    + var(--dsh-side-panel-chrome-icon)
+    + var(--dsh-side-panel-chrome-gap)
+  );
+  --dsh-side-panel-chrome-end: calc(
+    var(--dsh-side-panel-chrome-pad)
+    + var(--dsh-side-panel-chrome-icon)
+    + var(--dsh-side-panel-chrome-gap)
+    + var(--dsh-side-panel-chrome-icon)
+    + var(--dsh-side-panel-chrome-gap)
+  );
+  /* Hero/composer center in a ~400px iframe; a reserved scrollbar gutter
+     on the right reads as a wider right margin. Desktop keeps `stable`. */
+  --dsh-conversation-scrollbar-gutter: auto;
+}
+
+.frame[data-surface='side-panel'] .sidebarCol {
+  grid-column: 1;
+  overflow: visible;
+  background: transparent;
+  border-right: none;
+  pointer-events: none;
+}
+
+/* No padding-top: the session header (or the hidden-header spacer) occupies
+   the 48px chrome band so the overlay icons sit on the same row. */
+.frame[data-surface='side-panel'] .centerCol {
+  grid-column: 2;
+}
+
+.frame[data-surface='side-panel'] .detailsCol {
+  grid-column: 3;
+  visibility: hidden;
+  pointer-events: none;
+}

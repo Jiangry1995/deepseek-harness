@@ -25,7 +25,7 @@
 | `@deepseek-ai/dsh-tool-cordis` | `cordis_define`、`cordis_inspect_list`、`cordis_inspect_query`、`cordis_inspect_self`、`cordis_run`、`cordis_stop`、`cordis_undefine` | `ctx.tools`、`ctx.dynamicCordisRunner` | `tool/call`、`tool/result`、`process-local dynamic package lifecycle` | - | 不在任何随产品发布的树中，需要显式选择启用；动态 Package 代码可以访问真实运行时，见 .agents/notes/implemented/feature/2026-07-08-self-referential-cordis-toolset.md。该工具集注入 `@deepseek-ai/dsh-cordis-host-runner` 提供的 `ctx.dynamicCordisRunner`，后者拥有定义注册表和 vm 沙箱；组合缺少它时这些工具不会激活。运行中的 Package 在停止、undefine 或 DSH 重启前可以注册**额外的**模型可见工具；发生这类工具集变化时，系统会记录完整且有变动的请求头。 |
 | `@deepseek-ai/dsh-tool-bash-persistent` | `bash` | `ctx.tools`、`ctx.terminals`、`an owning Agent at execution time` | `tool/call`、`PTY shell state`、`tool/result` | - | 一个按所有者隔离的持久 bash 工具；部署组合提供 PTY 后端，并可覆盖面向模型的环境描述。 |
 | `@deepseek-ai/dsh-tool-str-replace-editor` | `str_replace_editor` | `ctx.tools`、`ctx.fs` | `tool/call`、`fs/observed after view presence/absence, edit absence, or successful mutation`、`tool/result` | - | 基于文件系统 seam 的独立查看／创建／唯一字面量替换／按行插入工具；可与任何 shell 或终端接口组合。 |
-| `@deepseek-ai/dsh-tool-fs` | `edit`、`read`、`read_image`、`write` | `ctx.tools`、`ctx.fs`、`ctx.systemPrompt`、`ctx.attachments (read_image registration)`、`ctx.llm + an image-capable route (read_image execution)` | `tool/call`、`fs/write-intent or fs/edit-intent for mutations`、`fs/observed after read presence/absence or successful file operation`、`durable attachment (read_image)`、`tool/result` | - | 先读后写／编辑策略由 `@deepseek-ai/dsh-fs-observation-policy` 添加；它是一个 `fs/*` 事件门禁插件，不会改变 schema。加载这些工具的部署按预期也应加载该插件。没有 `ctx.attachments` 时 `read_image` 不会注册；其 schema 与路由无关，执行时除非确切路由的模型声明图像输入，否则拒绝。 |
+| `@deepseek-ai/dsh-tool-fs` | `edit`、`read`、`read_image`、`write` | `ctx.tools`、`ctx.fs`、`ctx.systemPrompt`、`ctx.attachments (read_image registration)`、`ctx.llm + native image input or an automatic fallback (read_image execution)` | `tool/call`、`fs/write-intent or fs/edit-intent for mutations`、`fs/observed after read presence/absence or successful file operation`、`durable attachment (read_image)`、`tool/result` | - | 先读后写／编辑策略由 `@deepseek-ai/dsh-fs-observation-policy` 添加；它是一个 `fs/*` 事件门禁插件，不会改变 schema。加载这些工具的部署按预期也应加载该插件。没有 `ctx.attachments` 时 `read_image` 不会注册；其 schema 与路由无关，执行时要求原生图片输入或已确认的自动降级。 |
 | `@deepseek-ai/dsh-tool-fs-search` | `glob`、`grep` | `ctx.tools`、`ctx.subprocess`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | glob 和 grep 是无条件可用的发现工具，通过 ctx.subprocess spawn 随包提供的 ripgrep 二进制文件（`@vscode/ripgrep`），并作为普通前台调用运行，绝不作为后台任务；无需在宿主机安装 `rg`，也不经过 shell 层。本目录使用 `sampleOverCapGlobResults: true`；部署必须显式选择该行为。结果超过上限时，会通过可选的 ctx.spillStore 后端保存完整的格式化列表；在共置部署中，如果后端公开本地路径，返回的定位信息可供后续读取／搜索。 |
 | `@deepseek-ai/dsh-tool-terminal` | `terminal_close`、`terminal_list`、`terminal_open`、`terminal_read`、`terminal_send`、`terminal_signal` | `ctx.tools`、`ctx.terminals`、`ctx.systemPrompt`、`ctx.jobs at call time for run_in_background` | `tool/call`、`tool/result` | - | 这 6 个终端工具需要选择启用，用于补充一次性 bash／文件系统工具。`terminal_send(run_in_background: true)` 会注册到 `ctx.jobs`；schema 不包含 TUI、具名按键序列、BEL、调整尺寸、自动启动和跨 agent 共享。 |
 | `@deepseek-ai/dsh-tool-goal` | `create_goal`、`get_goal`、`update_goal` | `ctx.tools`、`ctx.agents`、`ctx.goals`、`ctx.systemPrompt`、`a calling Agent in an authorized open turn` | `tool/call`、`goal/change for mutations`、`tool/result` | - | create、edit、pause 和 resume 要求直接来自人类的根权限；complete 和 blocked 也接受确切的当前 Goal Round。blocked 的默认下限是 3 个获准的 Round。 |
@@ -40,6 +40,7 @@
 | `@deepseek-ai/dsh-tool-jobs` | `job_kill`、`job_list`、`job_output` | `ctx.tools`、`ctx.jobs`、`ctx.systemPrompt` | `tool/call`、`tool/result`、`user/message via agent.inject() for background completion notices` | - | 与任务种类无关的后台任务控制器：后台 bash 命令、PTY 发送和 subagent 都通过相同的 3 个工具读取、列出和终止。加载该插件会挂接控制器，从而启用生产方的 `ctx.jobs.start()`。 |
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`、`owning Agent session` | `tool/call`、`todo/write`、`tool/result` | - | todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为检查清单。`allowParallelInProgress` 是没有默认值的必填项，因此本目录明确选择 `true`，对应描述允许同时存在多个 `in_progress` 项。选择 `false` 的部署会获得同一工具，但描述会要求只能有 1 个活动任务。 |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`、`ctx.workflowEngine`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents the script children)` | `tool/call`、`tool/result` | - | - |
+| `@deepseek-ai/dsh-tool-browser` | `browser_activate_tab`、`browser_click`、`browser_close_tab`、`browser_fill`、`browser_focus`、`browser_list_tabs`、`browser_open_tab`、`browser_press`、`browser_read_page`、`browser_scroll`、`browser_select`、`browser_wait_for` | `ctx.tools`、`ctx.browser`、`ctx.systemPrompt` | `tool/call`、`browser/command Remote event`、`tool/result` | - | 浏览器工具把 MV3 提供方和带租约的 Host 路由置于 ctx.browser 之后；默认情况下，每项操作都会进入审批链。 |
 | `@deepseek-ai/dsh-tool-web` | `web_fetch`、`web_search` | `ctx.tools`、`ctx.web`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | web_search 和 web_fetch 将提供方选择置于 ctx.web 之后，使模型可见 schema 在更换后端时保持稳定。 |
 
 <a id="deepseek-aidsh-tool-ask-user"></a>
@@ -670,7 +671,7 @@ pwsh 工具是 Windows 组合中 bash 执行器 seam 的 PowerShell 方言消费
 
 ### `read_image`
 
-读取 PNG/JPEG/WebP/GIF 文件并返回图像本身。要求当前模型接受图像输入。
+读取 PNG/JPEG/WebP/GIF 文件并返回图像本身。要求原生图片输入或已配置的自动视觉降级。
 
 ```json
 {
@@ -715,7 +716,7 @@ pwsh 工具是 Windows 组合中 bash 执行器 seam 的 PowerShell 方言消费
 
 来源：[`packages/fs/tool-fs/src/index.ts`](../packages/fs/tool-fs/src/index.ts)
 
-先读后写／编辑策略由 `@deepseek-ai/dsh-fs-observation-policy` 添加；它是一个 `fs/*` 事件门禁插件，不会改变 schema。加载这些工具的部署按预期也应加载该插件。没有 `ctx.attachments` 时 `read_image` 不会注册；其 schema 与路由无关，执行时除非确切路由的模型声明图像输入，否则拒绝。
+先读后写／编辑策略由 `@deepseek-ai/dsh-fs-observation-policy` 添加；它是一个 `fs/*` 事件门禁插件，不会改变 schema。加载这些工具的部署按预期也应加载该插件。没有 `ctx.attachments` 时 `read_image` 不会注册；其 schema 与路由无关，执行时要求原生图片输入或已确认的自动降级。
 
 <a id="deepseek-aidsh-tool-fs-search"></a>
 
@@ -1218,7 +1219,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 
 ### `skill`
 
-加载可用 skill（技能）的完整说明。在执行点名某项 skill 或与其明确匹配的任务前，请使用会话 skill 目录中的确切名称调用此工具。
+加载可用 skill（技能）的完整说明。若用户点名某项 skill，请在操作前使用其目录中的确切名称调用此工具。否则，先根据请求结果和执行环境选择能力，只有所选路径需要某项 skill 的指令时才加载它。目录描述只是能力摘要，不是路由指令。当可用的直接工具能够完成请求效果时，不要仅因主题相似而加载 skill。
 
 ```json
 {
@@ -1828,6 +1829,373 @@ todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为
 ```
 
 来源：[`packages/workflow/tool-workflow/src/index.ts`](../packages/workflow/tool-workflow/src/index.ts)
+
+<a id="deepseek-aidsh-tool-browser"></a>
+
+## `@deepseek-ai/dsh-tool-browser`
+
+### `browser_activate_tab`
+
+根据浏览器分配的 id 激活一个标签页。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "tabId": {
+      "type": "number",
+      "description": "Non-negative tab id returned by browser_list_tabs or browser_open_tab."
+    }
+  },
+  "required": [
+    "tabId"
+  ]
+}
+```
+
+来源：[`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_click`
+
+使用最近一次 browser_read_page 结果中的 pageId 和 ref，点击一个可见且已启用的元素。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "pageId": {
+      "type": "string",
+      "description": "Page id from the latest browser_read_page result."
+    },
+    "ref": {
+      "type": "string",
+      "description": "Element ref from the same browser_read_page result."
+    }
+  },
+  "required": [
+    "pageId",
+    "ref"
+  ]
+}
+```
+
+来源：[`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_close_tab`
+
+根据浏览器分配的 id 关闭一个标签页。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "tabId": {
+      "type": "number",
+      "description": "Non-negative tab id returned by browser_list_tabs or browser_open_tab."
+    }
+  },
+  "required": [
+    "tabId"
+  ]
+}
+```
+
+来源：[`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_fill`
+
+使用最近一次 browser_read_page 结果中的 pageId 和 ref，替换可见可编辑字段中的文本。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "pageId": {
+      "type": "string",
+      "description": "Page id from the latest browser_read_page result."
+    },
+    "ref": {
+      "type": "string",
+      "description": "Field ref from the same browser_read_page result."
+    },
+    "value": {
+      "type": "string",
+      "description": "Complete replacement text."
+    },
+    "submit": {
+      "type": "boolean",
+      "description": "Submit the owning form or dispatch Enter after filling. Defaults to false."
+    }
+  },
+  "required": [
+    "pageId",
+    "ref",
+    "value"
+  ]
+}
+```
+
+来源：[`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_focus`
+
+使用最近一次 browser_read_page 结果中的 pageId 和 ref，聚焦一个字段或可聚焦动作。成功要求 document.activeElement 确实是该元素。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "pageId": {
+      "type": "string",
+      "description": "Page id from the latest browser_read_page result."
+    },
+    "ref": {
+      "type": "string",
+      "description": "Element ref from the same browser_read_page result."
+    }
+  },
+  "required": [
+    "pageId",
+    "ref"
+  ]
+}
+```
+
+来源：[`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_list_tabs`
+
+列出当前浏览器窗口中的标签页，包括 id、活动状态、URL 和可用标题。不要用它总结或检查当前页面；应改用 browser_read_page。
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+来源：[`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_open_tab`
+
+在用户当前 Chromium 窗口的新标签页中打开一个绝对 HTTP(S) URL。用户要求前往、打开或访问网站时使用此工具；不要改用 skill 工具或 shell CLI。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "url": {
+      "type": "string",
+      "description": "Absolute HTTP(S) URL without embedded credentials."
+    },
+    "active": {
+      "type": "boolean",
+      "description": "Whether the new tab becomes active. Defaults to true."
+    }
+  },
+  "required": [
+    "url"
+  ]
+}
+```
+
+来源：[`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_press`
+
+对最近一次 browser_read_page 返回的引用元素按下允许的键。允许的键：Enter、Escape、Tab、Space、ArrowUp、ArrowDown、ArrowLeft、ArrowRight、Home、End、PageUp、PageDown、Backspace、Delete。重复次数为 1–20。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "pageId": {
+      "type": "string",
+      "description": "Page id from the latest browser_read_page result."
+    },
+    "ref": {
+      "type": "string",
+      "description": "Element ref from the same browser_read_page result."
+    },
+    "key": {
+      "type": "string",
+      "description": "Allowed key name. Arbitrary key names are rejected."
+    },
+    "ctrl": {
+      "type": "boolean",
+      "description": "Hold Control. Defaults to false."
+    },
+    "alt": {
+      "type": "boolean",
+      "description": "Hold Alt. Defaults to false."
+    },
+    "shift": {
+      "type": "boolean",
+      "description": "Hold Shift. Defaults to false."
+    },
+    "meta": {
+      "type": "boolean",
+      "description": "Hold Meta. Defaults to false."
+    },
+    "repeat": {
+      "type": "number",
+      "description": "Repeat count from 1 through 20. Defaults to 1."
+    }
+  },
+  "required": [
+    "pageId",
+    "ref",
+    "key"
+  ]
+}
+```
+
+来源：[`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_read_page`
+
+从浏览器标签页读取有界的可见文本和当前非敏感表单值，包括 textarea 与 input 值、滚动目标和视口指标。省略 tabId 时读取当前活动网页标签页。密码、文件、隐藏字段、一次性验证码和支付敏感信息控件均被排除。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "tabId": {
+      "type": "number",
+      "description": "Browser-assigned tab id to read without first activating it. Omit to read the current active web tab."
+    }
+  }
+}
+```
+
+来源：[`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_scroll`
+
+滚动文档视口，或滚动最近一次 browser_read_page 返回的滚动目标。省略 ref 时滚动页面。如果容器已经位于请求的边界，结果会明确说明，而不是谎称发生了移动。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "pageId": {
+      "type": "string",
+      "description": "Page id from the latest browser_read_page result."
+    },
+    "ref": {
+      "type": "string",
+      "description": "Scroll-target ref from the same browser_read_page result. Omit to scroll the document viewport."
+    },
+    "movement": {
+      "type": "string",
+      "description": "One of line-up, line-down, line-left, line-right, page-up, page-down, page-left, page-right, top, bottom, left-edge, right-edge."
+    }
+  },
+  "required": [
+    "pageId",
+    "movement"
+  ]
+}
+```
+
+来源：[`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_select`
+
+使用 browser_read_page 返回的 pageId 和 ref，按精确值或可见文本选择原生选项。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "pageId": {
+      "type": "string",
+      "description": "Page id from the latest browser_read_page result."
+    },
+    "ref": {
+      "type": "string",
+      "description": "Native select ref from the same browser_read_page result."
+    },
+    "value": {
+      "type": "string",
+      "description": "Exact option value or visible option text."
+    }
+  },
+  "required": [
+    "pageId",
+    "ref",
+    "value"
+  ]
+}
+```
+
+来源：[`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_wait_for`
+
+等待页面发生变化、出现或消失指定文本、到达某个 URL，或进入稳定状态，然后返回新的页面快照。优先使用最近一次 browser_read_page 返回的 pageId；只有尚无页面快照时才使用 tabId。不要编造标签页 id。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "pageId": {
+      "type": "string",
+      "description": "Page id from the latest browser_read_page result. Preferred because it stays bound to the tab that produced the snapshot."
+    },
+    "tabId": {
+      "type": "number",
+      "description": "Browser-assigned tab id to observe only when no pageId is available."
+    },
+    "condition": {
+      "type": "object",
+      "description": "Wait condition: {kind:\"change\",documentId,afterRevision}, {kind:\"text\",text,state:\"present\"|\"absent\"}, {kind:\"url\",value,match:\"exact\"|\"prefix\"|\"contains\"}, or {kind:\"ready\"}.",
+      "additionalProperties": true,
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "documentId": {
+          "type": "string"
+        },
+        "afterRevision": {
+          "type": "number"
+        },
+        "text": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "match": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "timeoutMs": {
+      "type": "number",
+      "description": "Maximum wait in milliseconds from 100 through 30000. Defaults to 5000."
+    },
+    "stableMs": {
+      "type": "number",
+      "description": "Quiet period in milliseconds from 0 through 2000. Defaults to 150."
+    }
+  },
+  "required": [
+    "condition"
+  ]
+}
+```
+
+来源：[`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+浏览器工具把 MV3 提供方和带租约的 Host 路由置于 ctx.browser 之后；默认情况下，每项操作都会进入审批链。
 
 <a id="deepseek-aidsh-tool-web"></a>
 

@@ -38,6 +38,8 @@ export function WebSearchCard(props: WebSearchCardProps) {
         id="plugin-config-web-search-key"
         label={t('webSearchApiKey')}
         hint={t('webSearchApiKeyHint')}
+        showLabel={t('webSearchApiKeyShow')}
+        hideLabel={t('webSearchApiKeyHide')}
         // The credentials domain accepts a key even when the settings document
         // itself is read-only; they are separate stores with separate refusals.
         // Its own writability is what disables this control — a key sourced
@@ -52,6 +54,7 @@ export function WebSearchCard(props: WebSearchCardProps) {
         id="plugin-config-web-search-endpoint"
         label={t('webSearchBaseUrl')}
         hint={t('webSearchBaseUrlHint')}
+        placeholder="https://api.deepseek.com/anthropic/v1"
         overriddenLabel={t('overridden')}
         resetLabel={t('reset')}
         invalidLabel={t('invalidNumber')}

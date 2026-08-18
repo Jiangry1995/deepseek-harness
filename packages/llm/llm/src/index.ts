@@ -21,6 +21,7 @@ import type {
   StreamChunk,
 } from './types.ts'
 import { freezeMessage, type Message } from './message.ts'
+import { contentHasImage } from './content.ts'
 import { resolveRetryPolicy } from './retry-policy.ts'
 import type { ResolvedRetryPolicy } from './retry-policy.ts'
 import type { ProviderRequestId } from './brand.ts'
@@ -171,6 +172,34 @@ export interface PreparedLlmCall {
   stream(options: GenerateOptions): AsyncIterable<StreamChunk>
 }
 
+/** How one exact model route can carry image input at the time of resolution. */
+export type ImageInputResolution =
+  | { kind: 'native' }
+  | { kind: 'fallback' }
+  | { kind: 'unsupported' }
+  | { kind: 'unknown' }
+
+/**
+ * Optional provider that turns durable image blocks into logged text before a
+ * model which explicitly excludes image input receives the request.
+ */
+export interface LlmImageFallback {
+  /**
+   * Whether the provider currently has a configured, native image-capable route.
+   * @param signal - cancellation for the exact availability lookup.
+   * @returns true only while image projection can run.
+   */
+  available(signal?: AbortSignal): Promise<boolean>
+  /**
+   * Produce the complete text-only message list for one image-bearing call.
+   * Implementations must log every model-visible auxiliary request and the
+   * resulting projection before resolving.
+   * @param options - the resolved target call whose exact model excludes images.
+   * @returns the replacement messages sent to the target adapter.
+   */
+  project(options: GenerateOptions): Promise<Message[]>
+}
+
 /**
  * Provider-wire adapter for the harness message and stream vocabulary. Register implementations
  * with `ctx.llm.registerAdapter(providers, adapter)`. Every provider HTTP request must include
@@ -284,6 +313,7 @@ export interface DirectoryRegistrationHandle {
 export class LlmRuntime extends Service {
   private adapters = new Map<string, AdapterRegistration>()
   private directory = new Map<string, LlmConfigurableProvider>()
+  private imageFallback: LlmImageFallback | undefined
   private discoveries = new Map<
     string,
     (request: LlmModelDiscoveryRequest) => Promise<readonly LlmDiscoveredModel[]>
@@ -418,6 +448,54 @@ export class LlmRuntime extends Service {
    */
   listProviders(): LlmProviderInfo[] {
     return [...this.adapters.values()].map(({ provider }) => ({ ...provider }))
+  }
+
+  /**
+   * Register the process's sole automatic image-to-text fallback. The
+   * registration is released with its Cordis fiber.
+   * @param fallback - provider that logs and projects image-bearing requests.
+   * @returns disposer that removes this exact provider.
+   */
+  registerImageFallback(fallback: LlmImageFallback): () => void {
+    const dispose = this.ctx.effect(function* (this: LlmRuntime) {
+      if (this.imageFallback !== undefined) {
+        throw new LlmError('an image fallback is already registered', 'DUPLICATE_IMAGE_FALLBACK')
+      }
+      this.imageFallback = fallback
+      yield () => {
+        if (this.imageFallback === fallback) this.imageFallback = undefined
+      }
+    }.bind(this), 'llm.registerImageFallback()')
+    return () => { void dispose() }
+  }
+
+  /**
+   * Resolve whether one exact route handles images natively, through the
+   * installed fallback, not at all, or with unknown capability.
+   * @param provider - registered provider route.
+   * @param model - exact model id on the route.
+   * @param signal - cancellation for model and fallback availability lookup.
+   * @returns the current image-input resolution.
+   */
+  async resolveImageInput(
+    provider: string,
+    model: string,
+    signal?: AbortSignal,
+  ): Promise<ImageInputResolution> {
+    const info = await this.resolveModelInfo(provider, model, signal)
+    return this.resolveImageInputFor(info.inputModalities, signal)
+  }
+
+  /** Resolve image handling from exact-model metadata and the live fallback. */
+  private async resolveImageInputFor(
+    modalities: readonly ModelModality[] | undefined,
+    signal?: AbortSignal,
+  ): Promise<ImageInputResolution> {
+    if (modalities === undefined) return { kind: 'unknown' }
+    if (modalities.includes('image')) return { kind: 'native' }
+    const fallback = this.imageFallback
+    if (fallback === undefined || !await fallback.available(signal)) return { kind: 'unsupported' }
+    return { kind: 'fallback' }
   }
 
   /**
@@ -735,7 +813,11 @@ export class LlmRuntime extends Service {
     registration: AdapterRegistration,
     config: LlmCallConfig,
     signal?: AbortSignal,
-  ): Promise<{ config: LlmCallConfig; context?: LlmModelContext }> {
+  ): Promise<{
+    config: LlmCallConfig
+    context?: LlmModelContext
+    inputModalities?: readonly ModelModality[]
+  }> {
     const info = await this.resolveModelInfoFor(registration, config.model, signal)
     const defaulted = config.maxTokens === undefined && info.defaultMaxTokens !== undefined
       ? { ...config, maxTokens: info.defaultMaxTokens }
@@ -765,6 +847,7 @@ export class LlmRuntime extends Service {
     return {
       config: resolvedConfig,
       ...info.context === undefined ? {} : { context: info.context },
+      ...info.inputModalities === undefined ? {} : { inputModalities: info.inputModalities },
     }
   }
 
@@ -783,6 +866,9 @@ export class LlmRuntime extends Service {
     const context = resolved.context === undefined
       ? undefined
       : deepFreeze(structuredClone(resolved.context))
+    const inputModalities = resolved.inputModalities === undefined
+      ? undefined
+      : deepFreeze([...resolved.inputModalities])
     const adapterDefaults = deepFreeze<LlmCallConfigAdapterDefaults>({
       ...config.reasoningEffort === undefined && resolvedConfig.reasoningEffort !== undefined
         ? { reasoningEffort: true }
@@ -808,7 +894,11 @@ export class LlmRuntime extends Service {
           )
         }
         dispatched = true
-        return this.streamWithRegistration(options, { registration, config: resolvedConfig })
+        return this.streamWithRegistration(options, {
+          registration,
+          config: resolvedConfig,
+          ...inputModalities === undefined ? {} : { inputModalities },
+        })
       },
     })
   }
@@ -842,14 +932,19 @@ export class LlmRuntime extends Service {
    */
   private async * adapterStream(
     options: GenerateOptions,
-    prepared?: { registration: AdapterRegistration; config: LlmCallConfig },
+    prepared?: {
+      registration: AdapterRegistration
+      config: LlmCallConfig
+      inputModalities?: readonly ModelModality[]
+    },
   ): AsyncGenerator<StreamChunk> {
     let iterator: AsyncIterator<StreamChunk>
     try {
       const registration = prepared?.registration ?? this.registration(options.provider)
-      const resolvedConfig = prepared === undefined
-        ? (await this.resolveCallFor(registration, options, options.signal)).config
-        : prepared.config
+      const resolved = prepared === undefined
+        ? await this.resolveCallFor(registration, options, options.signal)
+        : prepared
+      const resolvedConfig = resolved.config
       if (prepared !== undefined && !callConfigEquals(options, resolvedConfig)) {
         throw new LlmError(
           'prepared LLM call config changed before adapter dispatch',
@@ -862,7 +957,8 @@ export class LlmRuntime extends Service {
           ? deepFreeze({ ...options, ...resolvedConfig })
           : { ...options, ...resolvedConfig }
       const adapter = registration.adapter
-      const stream = adapter.stream(this.forAdapter(resolvedOptions, adapter))
+      const projectedOptions = await this.projectImagesForAdapter(resolvedOptions, resolved.inputModalities)
+      const stream = adapter.stream(this.forAdapter(projectedOptions, adapter))
       iterator = stream[Symbol.asyncIterator]()
     } catch (error: unknown) {
       yield adapterFailureChunk(error, options.signal)
@@ -899,6 +995,19 @@ export class LlmRuntime extends Service {
     }
   }
 
+  /** Apply the registered fallback only for image-bearing calls to an explicitly text-only model. */
+  private async projectImagesForAdapter(
+    options: GenerateOptions,
+    modalities: readonly ModelModality[] | undefined,
+  ): Promise<GenerateOptions> {
+    if (modalities === undefined || modalities.includes('image')) return options
+    if (!options.messages.some(message => contentHasImage(message.content))) return options
+    const fallback = this.imageFallback
+    if (fallback === undefined || !await fallback.available(options.signal)) return options
+    const messages = deepFreeze((await fallback.project(options)).map(message => freezeMessage(message)))
+    return deepFreeze({ ...options, messages })
+  }
+
   /**
    * Stream one model call as raw chunks (token-level deltas). Replay state is
    * retained only when the same adapter instance owns its historical provider
@@ -916,7 +1025,11 @@ export class LlmRuntime extends Service {
 
   private streamWithRegistration(
     options: GenerateOptions,
-    prepared?: { registration: AdapterRegistration; config: LlmCallConfig },
+    prepared?: {
+      registration: AdapterRegistration
+      config: LlmCallConfig
+      inputModalities?: readonly ModelModality[]
+    },
   ): AsyncIterable<StreamChunk> {
     return this.ctx.waterfall(
       this,

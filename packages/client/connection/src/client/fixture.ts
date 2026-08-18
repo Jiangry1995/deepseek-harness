@@ -2962,6 +2962,14 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         models: fixtureModelGroups().flatMap(group => group.models.map(model => ({ id: model.id, name: model.name }))),
       }),
     },
+    web: {
+      // Fixture has no live provider; a successful probe is enough for the
+      // settings card to render its pass path without a network round-trip.
+      probeSearch: request => ok(request, {
+        providerId: request.payload.providerId,
+        sourceCount: 1,
+      }),
+    },
     respond(message: ClientResponse): Promise<RpcReceipt> {
       // Same routing discipline as the host: rpcId first, then the payload's
       // audit correlation; a settled or unknown id is not-pending.
@@ -3129,6 +3137,7 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'llm.providers': return this.api.llm.providers(request)
       case 'llm.models': return this.api.llm.models(request)
       case 'llm.discoverModels': return this.api.llm.discoverModels(request, signal)
+      case 'web.probeSearch': return this.api.web.probeSearch(request, signal)
     }
   }
 

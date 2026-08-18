@@ -930,6 +930,30 @@ Source: [`packages/core/session/src/types.ts:243`](../packages/core/session/src/
 
 Source: [`packages/core/session/src/types.ts:264`](../packages/core/session/src/types.ts)
 
+### `vision/*`
+
+<a id="visionfallback-request--log-only"></a>
+
+#### `vision/fallback-request` — log-only
+
+```ts persistence-catalog
+/** Log-only exact request recorded before auxiliary vision dispatch. */
+'vision/fallback-request': VisionFallbackRequestEventData
+```
+
+Source: [`packages/llm/llm-vision-fallback/src/events.ts:39`](../packages/llm/llm-vision-fallback/src/events.ts)
+
+<a id="visionfallback-result--log-only"></a>
+
+#### `vision/fallback-result` — log-only
+
+```ts persistence-catalog
+/** Log-only text projection recorded after successful auxiliary vision dispatch. */
+'vision/fallback-result': VisionFallbackResultEventData
+```
+
+Source: [`packages/llm/llm-vision-fallback/src/events.ts:41`](../packages/llm/llm-vision-fallback/src/events.ts)
+
 ### `web/*`
 
 <a id="webdeepseek-search-llm-request--log-only"></a>
@@ -942,3 +966,17 @@ Source: [`packages/core/session/src/types.ts:264`](../packages/core/session/src/
 ```
 
 Source: [`packages/web/web-search-deepseek/src/provider.ts:83`](../packages/web/web-search-deepseek/src/provider.ts)
+
+<a id="webnetworking--log-only"></a>
+
+#### `web/networking` — log-only
+
+```ts persistence-catalog
+/**
+ * Whether web_search / web_fetch are available from this point on.
+ * Last event wins; a log with none folds to enabled.
+ */
+'web/networking': { enabled: boolean }
+```
+
+Source: [`packages/web/web-networking/src/index.ts:27`](../packages/web/web-networking/src/index.ts)

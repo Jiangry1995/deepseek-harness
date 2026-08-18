@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>DeepSeek Harness</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <main id="panel-root" class="panel" data-state="connecting">
+      <header class="toolbar">
+        <div class="identity" aria-label="DeepSeek Harness">
+          <span class="mark" aria-hidden="true">D</span>
+          <span class="product">Harness</span>
+        </div>
+        <div id="panel-active-tab" class="active-tab" hidden>
+          <span class="tab-favicon-slot" aria-hidden="true">
+            <span id="panel-active-tab-icon-fallback" class="tab-favicon-fallback">
+              <svg viewBox="0 0 16 16">
+                <circle cx="8" cy="8" r="6" />
+                <path d="M2 8h12M8 2c2.1 2.1 2.1 9.9 0 12M8 2C5.9 4.1 5.9 11.9 8 14" />
+              </svg>
+            </span>
+            <img id="panel-active-tab-icon" class="tab-favicon" alt="" hidden>
+          </span>
+          <span id="panel-active-tab-title" class="active-tab-title"></span>
+          <button id="grant-page-access" class="grant-button" type="button" hidden>允许读取此页</button>
+        </div>
+        <button id="settings-button" class="connection" type="button" aria-label="连接设置" title="连接设置">
+          <span class="connection-dot" aria-hidden="true"></span>
+          <span id="panel-status" aria-live="polite">正在加载 Harness</span>
+        </button>
+      </header>
+
+      <div class="stage">
+        <iframe id="harness-frame" title="DeepSeek Harness 助手" hidden></iframe>
+
+        <section id="loading-view" class="state-view loading-view" aria-label="正在连接本地 Harness">
+          <div class="loading-mark" aria-hidden="true">D</div>
+          <div class="spinner" aria-hidden="true"></div>
+          <h1 id="loading-title">正在连接 Harness</h1>
+          <p id="loading-detail">侧边助手会在本地服务准备好后自动打开。</p>
+        </section>
+
+        <section id="offline-view" class="state-view" hidden>
+          <div class="state-card">
+            <span class="state-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M7 7.5A7 7 0 0 1 19 12v1.5M5.1 10.2A7 7 0 0 0 12 19h1.5M3 3l18 18" /></svg>
+            </span>
+            <p class="eyebrow">本地服务未连接</p>
+            <h1>Harness 未能启动</h1>
+            <p id="offline-detail" class="detail"></p>
+            <p class="instruction">可重新安装或修复本机伴随程序：</p>
+            <code>pnpm --filter @deepseek-ai/dsh-client-browser-extension windows:install</code>
+            <button id="retry-button" class="primary-button" type="button">重新连接</button>
+          </div>
+        </section>
+
+        <section id="settings-view" class="state-view" hidden>
+          <form id="settings-form" class="state-card settings-card">
+            <p class="eyebrow">连接设置</p>
+            <h1>本地 Harness 地址</h1>
+            <p class="detail">仅支持当前电脑上的 127.0.0.1 或 localhost HTTP 地址。</p>
+            <label for="harness-origin">服务地址</label>
+            <input id="harness-origin" name="origin" type="url" spellcheck="false" autocomplete="off" required />
+            <p id="settings-error" class="field-error" role="alert"></p>
+            <div class="form-actions">
+              <button id="cancel-button" class="secondary-button" type="button">取消</button>
+              <button class="primary-button" type="submit">保存并连接</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    </main>
+    <script type="module" src="sidepanel.js"></script>
+  </body>
+</html>

@@ -387,6 +387,22 @@ Depends on: [`LocalConfig`](#deepseek-aidsh-bash-local)
 
 Source: [`packages/shell/bash-sandbox/src/index.ts:35`](../packages/shell/bash-sandbox/src/index.ts)
 
+<a id="deepseek-aidsh-browser"></a>
+
+## `@deepseek-ai/dsh-browser`
+
+```ts config-catalog
+/** Browser service timing configuration. */
+export interface Config {
+  /** Maximum time in milliseconds to wait for one extension result. */
+  requestTimeoutMs?: number
+  /** Provider lease duration in milliseconds since its last heartbeat. Defaults to five minutes. */
+  clientLeaseMs?: number
+}
+```
+
+Source: [`packages/web/browser/src/index.ts:90`](../packages/web/browser/src/index.ts)
+
 <a id="deepseek-aidsh-client-connection"></a>
 
 ## `@deepseek-ai/dsh-client-connection`
@@ -1161,6 +1177,30 @@ export type Config = Readonly<Record<string, never>>
 ```
 
 Source: [`packages/llm/llm-retry/src/index.ts:24`](../packages/llm/llm-retry/src/index.ts)
+
+<a id="deepseek-aidsh-llm-vision-fallback"></a>
+
+## `@deepseek-ai/dsh-llm-vision-fallback`
+
+Requires: `llm` · `sessions`
+
+```ts config-catalog
+/** User-configurable automatic vision fallback fields. */
+export interface Config {
+  /** Registered provider route of the native visual helper. */
+  provider?: string
+  /** Exact native visual model id on {@link provider}. */
+  model?: string
+  /** Output-token cap for each auxiliary transcription. */
+  maxTokens?: number
+  /** End-to-end auxiliary request deadline in milliseconds. */
+  timeoutMs?: number
+  /** Stable instruction sent beside each image. */
+  prompt?: string
+}
+```
+
+Source: [`packages/llm/llm-vision-fallback/src/config.ts:26`](../packages/llm/llm-vision-fallback/src/config.ts)
 
 <a id="deepseek-aidsh-lsp-stdio"></a>
 
@@ -2372,6 +2412,24 @@ export interface Config {
 
 Source: [`packages/shell/tool-bash-persistent/src/index.ts:405`](../packages/shell/tool-bash-persistent/src/index.ts)
 
+<a id="deepseek-aidsh-tool-browser"></a>
+
+## `@deepseek-ai/dsh-tool-browser`
+
+Requires: `browser` · `systemPrompt` · `tools`
+
+```ts config-catalog
+/** Browser tool configuration. */
+export interface Config {
+  /** Cooperative timeout for each browser tool call in milliseconds. */
+  timeoutMs?: number
+  /** Ask through the tool approval chain before every browser operation. */
+  requireApproval?: boolean
+}
+```
+
+Source: [`packages/web/tool-browser/src/index.ts:24`](../packages/web/tool-browser/src/index.ts)
+
 <a id="deepseek-aidsh-tool-fs"></a>
 
 ## `@deepseek-ai/dsh-tool-fs`
@@ -2569,7 +2627,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/skill/tool-skill/src/index.ts:61`](../packages/skill/tool-skill/src/index.ts)
+Source: [`packages/skill/tool-skill/src/index.ts:64`](../packages/skill/tool-skill/src/index.ts)
 
 <a id="deepseek-aidsh-tool-str-replace-editor"></a>
 
@@ -2967,6 +3025,26 @@ export interface Config {
 
 Source: [`packages/web/web-search-exa/src/index.ts:38`](../packages/web/web-search-exa/src/index.ts)
 
+<a id="deepseek-aidsh-web-search-firecrawl"></a>
+
+## `@deepseek-ai/dsh-web-search-firecrawl`
+
+Requires: `web`
+
+```ts config-catalog
+/** Plugin config (all optional — `apply` fills env-var and constant defaults). */
+export interface Config {
+  /** Literal Firecrawl API key; prefer {@link apiKeyEnv} so no secret enters configuration files. */
+  apiKey?: string
+  /** Credential reference resolved for each operation; defaults to `FIRECRAWL_API_KEY`. */
+  apiKeyEnv?: string
+  /** Endpoint base; `/v1/search` and `/v1/scrape` are appended. */
+  baseURL?: string
+}
+```
+
+Source: [`packages/web/web-search-firecrawl/src/index.ts:44`](../packages/web/web-search-firecrawl/src/index.ts)
+
 <a id="deepseek-aidsh-web-search-perplexity"></a>
 
 ## `@deepseek-ai/dsh-web-search-perplexity`
@@ -2990,6 +3068,26 @@ export interface Config {
 ```
 
 Source: [`packages/web/web-search-perplexity/src/index.ts:32`](../packages/web/web-search-perplexity/src/index.ts)
+
+<a id="deepseek-aidsh-web-search-tavily"></a>
+
+## `@deepseek-ai/dsh-web-search-tavily`
+
+Requires: `web`
+
+```ts config-catalog
+/** Plugin config (all optional — `apply` fills env-var and constant defaults). */
+export interface Config {
+  /** Literal Tavily API key; prefer {@link apiKeyEnv} so no secret enters configuration files. */
+  apiKey?: string
+  /** Credential reference resolved for each search; defaults to `TAVILY_API_KEY`. */
+  apiKeyEnv?: string
+  /** Endpoint base; `/search` is appended. */
+  baseURL?: string
+}
+```
+
+Source: [`packages/web/web-search-tavily/src/index.ts:31`](../packages/web/web-search-tavily/src/index.ts)
 
 <a id="deepseek-aidsh-workflow-worker-thread"></a>
 
@@ -3028,6 +3126,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-agent` ([`packages/core/agent/src/index.ts`](../packages/core/agent/src/index.ts))
 - `@deepseek-ai/dsh-api-gateway` — requires `typert` ([`packages/api/gateway/src/index.ts`](../packages/api/gateway/src/index.ts))
 - `@deepseek-ai/dsh-api-remotes` ([`packages/api/remotes/src/index.ts`](../packages/api/remotes/src/index.ts))
+- `@deepseek-ai/dsh-client-browser-extension` ([`packages/client/browser-extension/src/index.ts`](../packages/client/browser-extension/src/index.ts))
 - `@deepseek-ai/dsh-client-locale` ([`packages/client/locale/src/index.ts`](../packages/client/locale/src/index.ts))
 - `@deepseek-ai/dsh-client-modules` — requires `webServer` · `loader` ([`packages/client/modules/src/index.ts`](../packages/client/modules/src/index.ts))
 - `@deepseek-ai/dsh-client-runtime` ([`packages/client/runtime/src/index.ts`](../packages/client/runtime/src/index.ts))
@@ -3051,6 +3150,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-client-ui-settings-models` ([`packages/client/ui-settings-models/src/index.ts`](../packages/client/ui-settings-models/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-settings-plugin-inventory` ([`packages/client/ui-settings-plugin-inventory/src/index.ts`](../packages/client/ui-settings-plugin-inventory/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-settings-plugins` ([`packages/client/ui-settings-plugins/src/index.ts`](../packages/client/ui-settings-plugins/src/index.ts))
+- `@deepseek-ai/dsh-client-ui-settings-vision-fallback` ([`packages/client/ui-settings-vision-fallback/src/index.ts`](../packages/client/ui-settings-vision-fallback/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-sidebar` ([`packages/client/ui-sidebar/src/index.ts`](../packages/client/ui-sidebar/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-skill` ([`packages/client/ui-skill/src/index.ts`](../packages/client/ui-skill/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-subagent` ([`packages/client/ui-subagent/src/index.ts`](../packages/client/ui-subagent/src/index.ts))
@@ -3058,6 +3158,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-client-ui-tool` ([`packages/client/ui-tool/src/index.ts`](../packages/client/ui-tool/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-trajectory` ([`packages/client/ui-trajectory/src/index.ts`](../packages/client/ui-trajectory/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-user-questions` ([`packages/client/ui-user-questions/src/index.ts`](../packages/client/ui-user-questions/src/index.ts))
+- `@deepseek-ai/dsh-client-ui-web` ([`packages/client/ui-web/src/index.ts`](../packages/client/ui-web/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-workflow-run` ([`packages/client/ui-workflow-run/src/index.ts`](../packages/client/ui-workflow-run/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-workspace` ([`packages/client/ui-workspace/src/index.ts`](../packages/client/ui-workspace/src/index.ts))
 - `@deepseek-ai/dsh-command-compact` — requires `commands` · `compaction` ([`packages/compaction/command-compact/src/index.ts`](../packages/compaction/command-compact/src/index.ts))
@@ -3089,6 +3190,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-tool-cordis` — requires `tools` · `systemPrompt` · `dynamicCordisRunner` · `cordisInspect` ([`packages/extensions/tool-cordis/src/index.ts`](../packages/extensions/tool-cordis/src/index.ts))
 - `@deepseek-ai/dsh-tool-subagent-control` — requires `tools` · `subagents` ([`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts))
 - `@deepseek-ai/dsh-user-questions` ([`packages/interaction/user-questions/src/index.ts`](../packages/interaction/user-questions/src/index.ts))
+- `@deepseek-ai/dsh-web-networking` ([`packages/web/web-networking/src/index.ts`](../packages/web/web-networking/src/index.ts))
 - `@deepseek-ai/dsh-workspace` — requires `storageDomain` · `sessionPersistence` ([`packages/workspace/workspace/src/index.ts`](../packages/workspace/workspace/src/index.ts))
 
 ## Seam packages (not directly loadable)
@@ -3149,3 +3251,4 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 - `@deepseek-ai/dsh-typert-generator` ([`packages/typert/generator/src/index.ts`](../packages/typert/generator/src/index.ts))
 - `@deepseek-ai/dsh-typert-protocol` ([`packages/typert/protocol/src/index.ts`](../packages/typert/protocol/src/index.ts))
 - `@deepseek-ai/dsh-typert-registry` ([`packages/typert/registry/src/index.ts`](../packages/typert/registry/src/index.ts))
+- `@deepseek-ai/dsh-vision-fallback` ([`packages/bundle/vision-fallback/src/index.ts`](../packages/bundle/vision-fallback/src/index.ts))

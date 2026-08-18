@@ -26,6 +26,9 @@
       "path": "../../credentials/credentials"
     },
     {
+      "path": "../../web/browser"
+    },
+    {
       "path": "../../interaction/commands"
     },
     {

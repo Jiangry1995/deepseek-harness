@@ -221,10 +221,14 @@ describe('sessions domain schemas', () => {
             ],
             defaultEffort: 'off',
           },
+          inputModalities: ['text', 'image'],
         }],
       }],
       failures: [{ id: 'broken', name: 'Broken', message: 'offline' }],
-    }).groups[0]?.models[0]?.id).toBe('deepseek-v4-flash')
+    }).groups[0]?.models[0]).toMatchObject({
+      id: 'deepseek-v4-flash',
+      inputModalities: ['text', 'image'],
+    })
     expect(sessionSelectModelRequestSchema.parse({
       sessionId: 's1',
       provider: 'deepseek-official',

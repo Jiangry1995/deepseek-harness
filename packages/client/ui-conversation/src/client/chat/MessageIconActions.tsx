@@ -3,10 +3,11 @@
 
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import {
-  IconBranchOutline16, IconCheckOutline16, IconCopyOutline16, Tooltip, writeClipboard,
+  IconBranchOutline16, IconCheckOutline16, IconCopyOutline16, IconQuestionOutline14, Tooltip,
+  writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
-import { formatLatencySeconds, formatMessageClock, formatRunDuration, formatTokensPerSecond } from './message-chrome.ts'
+import { formatLatencySeconds, formatMessageClock, formatRunDuration, formatTimingLabel, formatTokensPerSecond } from './message-chrome.ts'
 import { useCalendarDay } from './use-calendar-day.ts'
 import css from './MessageIconActions.module.css'
 
@@ -78,6 +79,9 @@ export function MessageIconActions({
   // The dot is decorative and stays hidden, but its margins separate the
   // readings only on screen: without the flanking spaces a reader hears one
   // run-on string ("Ran for 13sTTFT 0.2s12 tok/s") instead of three facts.
+  const timingLabel = time === undefined
+    ? ''
+    : formatTimingLabel(time, { runMs, ttftMs, tokensPerSecond }, t, day)
   const clockEl = time === undefined ? null : (
     <span className={clock === 'start' ? css.timeStart : css.timeEnd}>
       {formatMessageClock(time, t, day)}
@@ -107,9 +111,24 @@ export function MessageIconActions({
       )}
     </span>
   )
+  // Plugin chrome: the inline hover clock is too wide. The same facts live
+  // on this question mark; desktop CSS keeps the control hidden.
+  const statsHint = time === undefined ? null : (
+    <Tooltip label={timingLabel} side="bottom" maxWidth={280}>
+      <button
+        type="button"
+        className={`${css.action} ${css.statsHint}`}
+        aria-label={timingLabel}
+        data-timing-hint=""
+      >
+        <IconQuestionOutline14 size={16} />
+      </button>
+    </Tooltip>
+  )
   return (
     <div className={className === undefined ? css.actions : `${css.actions} ${className}`}>
       {clock === 'start' ? clockEl : null}
+      {clock === 'start' ? statsHint : null}
       <Tooltip label={copied ? t('copied') : t('copy')} side="bottom">
         <button type="button" className={css.action} aria-label={copied ? t('copied') : t('copy')} onClick={onCopy}>
           {copied ? <IconCheckOutline16 /> : <IconCopyOutline16 />}
@@ -135,6 +154,7 @@ export function MessageIconActions({
       {onBranch !== undefined && branchUnavailable && (
         <span id={reasonId} className={css.visuallyHidden}>{t('message.branchUnavailable')}</span>
       )}
+      {clock === 'end' ? statsHint : null}
       {clock === 'end' ? clockEl : null}
     </div>
   )

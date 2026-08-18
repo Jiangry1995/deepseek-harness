@@ -185,6 +185,16 @@ registerFetchProvider(provider: WebFetchProvider): () => void
 async search(request: WebSearchRequest, signal?: AbortSignal): Promise<WebSearchResult>
 
 /**
+ * Probe one registered search provider by id, bypassing configured selection.
+ * Runs a minimal search so the settings surface can verify credentials and
+ * endpoint reachability without changing which provider the seam selects.
+ * @param providerId - registry id (`tavily`, `firecrawl`, …).
+ * @param signal - optional cancellation signal forwarded to the provider.
+ * @returns how many sources the probe search returned.
+ */
+async probeSearch( providerId: string, signal?: AbortSignal, ): Promise<{ providerId: string; sourceCount: number }>
+
+/**
  * Retrieve one URL through the selected provider. Resolves the provider at
  * call time with the selection rules above; throws {@link WebError} when the
  * capability cannot run. A non-2xx response is a result, not a throw.
@@ -196,4 +206,22 @@ async fetch(request: WebFetchRequest, signal?: AbortSignal): Promise<WebFetchRes
 ```
 
 Source: [`packages/web/web/src/index.ts:74`](../../packages/web/web/src/index.ts)
+
+<a id="ctxwebnetworking--webnetworkingcontroller"></a>
+
+### `ctx.webNetworking` — `WebNetworkingController`
+
+Host service that keeps each agent's live tool mask in sync with the session log. Restrictions are process-local and must be re-applied after resume; the log is the durable source of truth.
+
+```ts cordis-catalog
+/**
+ * Align the live restrict mask with the folded session preference.
+ * @param agent - the agent whose inherited web tools to mask or restore.
+ */
+sync(agent: Agent): void
+```
+
+Types: [Agent](core.md)
+
+Source: [`packages/web/web-networking/src/index.ts:60`](../../packages/web/web-networking/src/index.ts)
 <!-- END GENERATED cordis-surface -->

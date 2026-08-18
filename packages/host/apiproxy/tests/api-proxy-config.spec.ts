@@ -353,12 +353,16 @@ describe('settings domain', () => {
     ctx.settings.register(settingsNamespace('web-search-deepseek'), z.object({
       baseURL: z.string(),
     }))
+    ctx.settings.register(settingsNamespace('llm-vision-fallback'), z.object({
+      provider: z.string(),
+      model: z.string(),
+    }))
     const api = createApiProxy(ctx, DEFAULTS)
 
     const value = expectOk(await api.settings.describe(request({})))
     expect(value.namespaces.map(view => view.ns)).toEqual([
       'llm-deepseek', 'permission', 'ui-theme', 'locale', 'ui-conversation',
-      'shell', 'agent-loop', 'web-search-deepseek',
+      'shell', 'agent-loop', 'web-search-deepseek', 'llm-vision-fallback',
     ])
     const permission = expectOk(await api.settings.mutate(request({
       ns: 'permission',
@@ -395,6 +399,17 @@ describe('settings domain', () => {
       ops: [{ op: 'set', path: ['baseURL'], value: 'https://search.test/v1' }],
     })))
     expect(webSearch.value).toEqual({ baseURL: 'https://search.test/v1' })
+    const visionFallback = expectOk(await api.settings.mutate(request({
+      ns: 'llm-vision-fallback',
+      ops: [
+        { op: 'set', path: ['provider'], value: 'siliconflow' },
+        { op: 'set', path: ['model'], value: 'Qwen/Qwen3-VL-32B-Thinking' },
+      ],
+    })))
+    expect(visionFallback.value).toEqual({
+      provider: 'siliconflow',
+      model: 'Qwen/Qwen3-VL-32B-Thinking',
+    })
 
     for (const response of [
       await api.settings.update(request({ ns: 'some-other-plugin', patch: { secretPath: '/etc/shadow' } })),

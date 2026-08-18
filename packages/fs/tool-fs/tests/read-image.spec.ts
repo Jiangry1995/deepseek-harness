@@ -95,6 +95,7 @@ interface SetupOptions {
   llm?: boolean
   storeConfig?: { maxImageBytes?: number; maxImagePixels?: number; maxMessageImageBytes?: number }
   toolMode?: ToolConfig['mode']
+  imageFallback?: boolean
 }
 
 async function setup(options: SetupOptions = {}) {
@@ -116,6 +117,12 @@ async function setup(options: SetupOptions = {}) {
       { provider: 'visual', id: 'text-model', name: 'Text', inputModalities: ['text'] },
       { provider: 'visual', id: 'legacy-model', name: 'Legacy' },
     ], options.resolvedModels))
+    if (options.imageFallback === true) {
+      ctx.llm.registerImageFallback({
+        available: () => Promise.resolve(true),
+        project: options => Promise.resolve(options.messages),
+      })
+    }
   }
   await ctx.plugin(ToolFs)
   return ctx
@@ -262,6 +269,16 @@ describe('strict image-modality gate', () => {
     })
     const result = await readImage(ctx, { file_path: 'red.png' }, agentOn('hidden-vision'))
     expect(result.isError).toBe(false)
+  })
+
+  it('accepts a text-only route when the LLM runtime has a confirmed image fallback', async () => {
+    await writeFile(join(dir, 'red.png'), PNG_1X1)
+    const ctx = await setup({ imageFallback: true })
+
+    const result = await readImage(ctx, { file_path: 'red.png' }, agentOn('text-model'))
+
+    expect(result.isError).toBe(false)
+    expect(result.content.some(block => block.type === 'image')).toBe(true)
   })
 
   it.each([

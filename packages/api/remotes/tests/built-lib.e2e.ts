@@ -18,6 +18,8 @@ const requiredArtifacts = [
   'packages/client/connection/lib/client.js',
   'packages/client/connection/lib/index.js',
   'packages/api/remotes/lib/client.js',
+  'packages/web/browser/lib/index.js',
+  'packages/web/browser/lib/typert.host.js',
   'packages/core/agent/lib/index.js',
   'packages/core/session/lib/index.js',
   'packages/goal/goal/lib/index.js',
@@ -28,12 +30,14 @@ const requiredArtifacts = [
   'packages/typert/registry/lib/index.js',
 ].every(path => existsSync(artifact(path)))
 
-describe.skipIf(!requiredArtifacts)('Goal Remote built LIB chain', () => {
+describe.skipIf(!requiredArtifacts)('Generated Remote built LIB chain', () => {
   it('runs root and Agent-scoped calls through generated bundles and real HTTP', async () => {
     const urls = Object.fromEntries(Object.entries({
       agent: 'packages/core/agent/lib/index.js',
       apiGatewayClient: 'packages/api/gateway/lib/client.js',
       apiGatewayHost: 'packages/api/gateway/lib/index.js',
+      browser: 'packages/web/browser/lib/index.js',
+      browserTypert: 'packages/web/browser/lib/typert.host.js',
       connectionClient: 'packages/client/connection/lib/client.js',
       connectionHost: 'packages/client/connection/lib/index.js',
       goal: 'packages/goal/goal/lib/index.js',
@@ -50,6 +54,8 @@ describe.skipIf(!requiredArtifacts)('Goal Remote built LIB chain', () => {
       const urls = ${JSON.stringify(urls)}
       const { Context } = cordis
       const { default: AgentRegistry } = await import(urls.agent)
+      const { default: BrowserService } = await import(urls.browser)
+      const { TYPERT: BROWSER_TYPERT } = await import(urls.browserTypert)
       const connectionHost = await import(urls.connectionHost)
       const { default: TypertRemoteService } = await import(urls.apiGatewayHost)
       const { default: GoalService } = await import(urls.goal)
@@ -72,7 +78,9 @@ describe.skipIf(!requiredArtifacts)('Goal Remote built LIB chain', () => {
       await host.plugin(AgentRegistry)
       await host.plugin(TypertRemoteService)
       await host.plugin(GoalService)
+      await host.plugin(BrowserService, { requestTimeoutMs: 5_000 })
       host.typert.register(TYPERT)
+      host.typert.register(BROWSER_TYPERT)
 
       const makeAgent = rawId => {
         const session = new Session(SessionId(rawId))
@@ -157,6 +165,52 @@ describe.skipIf(!requiredArtifacts)('Goal Remote built LIB chain', () => {
       )
       const agentContext = client.extend({ builtAgentId: scopedAgent.id })
       const scopedResult = await agentContext.remote.goals.create({ objective: 'scoped goal', maxGoalRounds: 3 })
+      const browserLease = (await client.remote.browser.connect('built-browser', true)).value
+      const browserAbort = new AbortController()
+      const browserCompletion = new Promise((resolveCompletion, rejectCompletion) => {
+        const off = host.on('browser/command', command => {
+          off()
+          void client.remote.browser.complete({
+            requestId: command.requestId,
+            clientId: browserLease.clientId,
+            response: {
+              ok: true,
+              value: {
+                kind: 'read-page',
+                page: {
+                  tab: { id: 7, windowId: 3, active: true, url: 'https://example.test/', title: 'Example' },
+                  pageId: '11111111-1111-4111-8111-111111111111',
+                  documentId: '22222222-2222-4222-8222-222222222222',
+                  revision: 4,
+                  viewport: {
+                    width: 1280,
+                    height: 720,
+                    scrollX: 0,
+                    scrollY: 120,
+                    documentWidth: 1280,
+                    documentHeight: 2400,
+                  },
+                  text: 'built browser page',
+                  fields: [],
+                  actions: [],
+                  scrollTargets: [],
+                  truncated: false,
+                },
+              },
+            },
+          }).then(
+            completion => { resolveCompletion(completion.value) },
+            error => {
+              browserAbort.abort(error)
+              rejectCompletion(error)
+            },
+          )
+        })
+      })
+      const [browserPage, browserCompletionReceipt] = await Promise.all([
+        host.browser.readPage(browserAbort.signal),
+        browserCompletion,
+      ])
       const result = {
         invalidRejected,
         rootResult: rootResult.value,
@@ -166,6 +220,8 @@ describe.skipIf(!requiredArtifacts)('Goal Remote built LIB chain', () => {
         scopedGoal: host.goals.get(scopedAgent)?.objective,
         rootEvents: rootAgent.session.events.length,
         scopedEvents: scopedAgent.session.events.length,
+        browserPage,
+        browserCompletionReceipt,
       }
 
       await client.fiber.dispose()
@@ -188,6 +244,13 @@ describe.skipIf(!requiredArtifacts)('Goal Remote built LIB chain', () => {
       scopedGoal: string
       rootEvents: number
       scopedEvents: number
+      browserPage: {
+        documentId: string
+        revision: number
+        viewport: { scrollY: number; documentHeight: number }
+        scrollTargets: unknown[]
+      }
+      browserCompletionReceipt: { accepted: boolean }
     }
     expect(output).toMatchObject({
       invalidRejected: true,
@@ -198,6 +261,13 @@ describe.skipIf(!requiredArtifacts)('Goal Remote built LIB chain', () => {
       scopedGoal: 'scoped goal',
       rootEvents: 2,
       scopedEvents: 1,
+      browserPage: {
+        documentId: '22222222-2222-4222-8222-222222222222',
+        revision: 4,
+        viewport: { scrollY: 120, documentHeight: 2400 },
+        scrollTargets: [],
+      },
+      browserCompletionReceipt: { accepted: true },
     })
     expect(output.rootResult.ref.id).toMatch(/^goal-/)
     expect(output.scopedResult.ref.id).toMatch(/^goal-/)

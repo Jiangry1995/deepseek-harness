@@ -166,6 +166,7 @@ describe('SettingsPanel navigation', () => {
     mount()
     openPanel()
     expect(screen.getByRole('button', { name: 'General' }).getAttribute('aria-current')).toBe('true')
+    expect(screen.getByRole('button', { name: 'General' }).getAttribute('title')).toBe('General')
     expect(screen.getByRole('button', { name: 'Models' }).getAttribute('aria-current')).toBeNull()
     expect(screen.getByTestId('section-general')).toBeTruthy()
   })

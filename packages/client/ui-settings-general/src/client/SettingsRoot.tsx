@@ -66,11 +66,13 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
           <div className={css.navTitle} id={titleId}>{renderSlot('settings.header', {})}</div>
           <div className={css.navList}>
             {rows.map(row => (
+              /* title remains after the rail collapses to icons below 640px. */
               <button
                 key={row.id}
                 type="button"
                 className={clsx(css.navCell, row.id === active && css.active)}
                 aria-current={row.id === active ? 'true' : undefined}
+                title={row.label}
                 onClick={() => { onSelect(row.id) }}
               >
                 {navIcon(row.id)}

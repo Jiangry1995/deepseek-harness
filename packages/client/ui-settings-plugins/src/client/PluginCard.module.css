@@ -60,6 +60,7 @@
   font-size: 13px;
   line-height: 1.5;
   color: var(--dsw-alias-label-tertiary);
+  overflow-wrap: anywhere;
 }
 
 .chevron {
@@ -107,6 +108,14 @@
   border-top: 1px solid var(--dsw-alias-border-l2);
 }
 
+.footerStart {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .failed {
   flex: 1;
   min-width: 0;
@@ -116,6 +125,7 @@
   color: var(--dsw-alias-label-error);
 }
 
+.test,
 .discard,
 .save {
   appearance: none;
@@ -126,6 +136,34 @@
   font-size: 13px;
   line-height: 1.5;
   cursor: pointer;
+}
+
+.test {
+  border-color: var(--dsw-alias-border-l2);
+  background: none;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.test:hover:not(:disabled) {
+  color: var(--dsw-alias-label-primary);
+  border-color: var(--dsw-alias-label-dimmed);
+}
+
+.probeStatus {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.probeOk {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.probeFailed {
+  color: var(--dsw-alias-label-error);
 }
 
 .discard {
@@ -144,12 +182,14 @@
   color: var(--dsw-alias-bg-layer-3);
 }
 
+.test:disabled,
 .discard:disabled,
 .save:disabled {
   opacity: 0.4;
   cursor: default;
 }
 
+.test:focus-visible,
 .discard:focus-visible,
 .save:focus-visible {
   outline: 2px solid var(--dsw-alias-brand-primary);

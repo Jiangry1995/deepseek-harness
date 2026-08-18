@@ -86,6 +86,13 @@ export interface RpcErrorDetailsMap {
    * details name the endpoint asked, never the credential offered.
    */
   'model-discovery-failed': { settingsNs: string; baseURL?: string }
+  /**
+   * Probing a registered web search provider failed: missing/unavailable
+   * provider, refused credential, or unreachable endpoint. The message is the
+   * provider/seam text shown on the settings card; details name only the
+   * provider id, never the credential.
+   */
+  'web-probe-failed': { providerId: string }
   'title-invalid': { sessionId: SessionId }
   'fork-unavailable': { sessionId: SessionId }
   'subagent-parent-unavailable': { parentSessionId: SessionId }

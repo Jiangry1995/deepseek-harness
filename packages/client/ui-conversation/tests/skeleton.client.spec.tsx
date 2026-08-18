@@ -337,6 +337,8 @@ describe('ConversationRoot resident composer', () => {
     expect(seat?.contains(textarea)).toBe(true)
     expect(b.slotCalls).toContain('conversation.session.header.actions')
     expect(b.slotCalls).toContain('conversation.session.header.utilities')
+    const viewSwitch = b.view.container.querySelector('[data-session-view-switch]')
+    expect(viewSwitch?.querySelector('[role="tablist"]')).not.toBeNull()
   })
 
   it('sticky composer seat wraps the whole overlay chain, not only the fallback stack', () => {

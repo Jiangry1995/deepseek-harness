@@ -7,6 +7,17 @@ export type ClockTranslate = Translate<'clock.md' | 'clock.ymd'>
 
 /** The elapsed-duration share of the conversation dictionary. */
 export type RunDurationTranslate = Translate<'duration.seconds' | 'duration.minutes'>
+
+/** Locale keys the compact timing tooltip (side-panel question mark) needs. */
+export type TimingLabelTranslate = Translate<
+  | 'clock.md'
+  | 'clock.ymd'
+  | 'duration.seconds'
+  | 'duration.minutes'
+  | 'message.ranFor'
+  | 'message.ttft'
+  | 'message.tokensPerSecond'
+>
 function pad2(n: number): string {
   return String(n).padStart(2, '0')
 }
@@ -67,6 +78,38 @@ export function formatLatencySeconds(ms: number): string {
 export function formatTokensPerSecond(tps: number): string {
   const clamped = Math.max(0, tps)
   return clamped >= 10 ? String(Math.round(clamped)) : String(Math.round(clamped * 10) / 10)
+}
+
+/**
+ * One-line timing facts for the side-panel question-mark tooltip.
+ * Joins clock, run time, TTFT, and throughput with ` · ` (no extra CSS gaps).
+ * @param time - Unix epoch ms from the source session event.
+ * @param extras - Optional turn readings; omitted fields stay off the line.
+ * @param t - Translate seat for clock, duration, and message timing templates.
+ * @param now - Reference instant for the day/year cut.
+ * @returns Compact label, e.g. `8月17日 17:25 · 用时 8秒 · 首 token 1.1秒 · 142 tok/s`.
+ */
+export function formatTimingLabel(
+  time: number,
+  extras: {
+    runMs?: number | undefined
+    ttftMs?: number | undefined
+    tokensPerSecond?: number | undefined
+  },
+  t: TimingLabelTranslate,
+  now: number,
+): string {
+  const parts = [formatMessageClock(time, t, now)]
+  if (extras.runMs !== undefined) {
+    parts.push(t('message.ranFor', { duration: formatRunDuration(extras.runMs, t) }))
+  }
+  if (extras.ttftMs !== undefined) {
+    parts.push(t('message.ttft', { seconds: formatLatencySeconds(extras.ttftMs) }))
+  }
+  if (extras.tokensPerSecond !== undefined) {
+    parts.push(t('message.tokensPerSecond', { tps: formatTokensPerSecond(extras.tokensPerSecond) }))
+  }
+  return parts.join(' · ')
 }
 
 /**

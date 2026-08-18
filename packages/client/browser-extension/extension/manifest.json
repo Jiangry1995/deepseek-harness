@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "DeepSeek Harness Side Assistant",
+  "description": "Opens DeepSeek Harness beside the current page and executes approved tab operations.",
+  "version": "0.1.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA4hXMH9FOBnkxo0/zO4DUdSAQa8BuZ3UHalR1ABH1TGjq+pPUgMhd6FcjdeRg3jAVKw1Kn/48FnEF3DNaxJ4eFMmrM+ASAqWK6C0XW9D0UKa/cvBx6iq85al7EEsCtOW/NSOqeULsULZPvb+XsDVLnnq0+JO6907XF5XEx4TRB7KG8pSlRq+qhFqPmokoq2ipdPvcfgUIo8sLbNjyk53B+T91yuqJwrdEhtD9YaU8NNcZVwYdwcacYg+nHF/VVa8VbPraVsny5txxoI7iF1R27Omkq9ZTicLxwB5xaES5TT6G/EzjowIb5fuWcZMLMSph98OCbnvrhIku4NiDKfgGLQIDAQAB",
+  "permissions": ["tabs", "sidePanel", "storage", "nativeMessaging", "activeTab", "scripting"],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "action": {
+    "default_title": "Open DeepSeek Harness"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://127.0.0.1/*", "http://localhost/*"],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["page-content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; frame-src http://127.0.0.1:* http://localhost:*; connect-src http://127.0.0.1:* http://localhost:*; img-src 'self' data: http: https:"
+  }
+}

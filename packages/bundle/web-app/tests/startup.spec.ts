@@ -12,6 +12,7 @@ import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import { internals, provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import { afterEach, describe, expect, it } from 'vitest'
+import { internals as claimInternals } from '../src/single-instance.ts'
 import { apply, WEB_STARTUP_SERVICE, type WebStartupValues } from '../src/startup.ts'
 
 /** What one fixture boot observed. */
@@ -22,11 +23,13 @@ interface Observed {
 }
 
 const disposers: (() => Promise<void>)[] = []
+const realClaimDirectory = claimInternals.claimDirectory
 
 afterEach(async () => {
   for (const dispose of disposers.splice(0)) await dispose()
   internals.stdout = process.stdout
   internals.stderr = process.stderr
+  claimInternals.claimDirectory = realClaimDirectory
 })
 
 /**
@@ -34,11 +37,14 @@ afterEach(async () => {
  * @param args - the invocation's inner arguments.
  * @returns the service value and observed consumer/process effects.
  */
-async function bootProvider(args: string[]): Promise<{
+async function bootProvider(args: string[], claimDirectory?: string): Promise<{
   values: WebStartupValues | undefined
   observed: Observed
 }> {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-web-startup-'))
+  // Keep the address claim inside a fixture: the real directory is shared with
+  // every other process on the machine, including a live tray.
+  claimInternals.claimDirectory = claimDirectory ?? dir
   const observed: Observed = { exits: [], out: '' }
   writeFileSync(join(dir, 'reader.mjs'), `
 export function apply(_ctx, config) { globalThis.__webStartupObserved.readerConfig = config }
@@ -110,6 +116,27 @@ describe('web command-line provider', () => {
       port: 3080,
       trustedHosts: [],
     })
+  })
+
+  it('refuses a second app that would serve an address this one already claimed', async () => {
+    const shared = mkdtempSync(join(tmpdir(), 'dsh-web-claim-'))
+    const first = await bootProvider([], shared)
+    expect(first.values).toEqual({ trustedHosts: [] })
+
+    const second = await bootProvider([], shared)
+    expect(second.observed.out).toContain('already claimed http://127.0.0.1:3080')
+    expect(second.observed.out).toContain(`pid ${String(process.pid)}`)
+    expect(second.values).toBeUndefined()
+    expect(second.observed.exits).toEqual([1])
+  })
+
+  it('leaves a differently addressed app free to boot beside this one', async () => {
+    const shared = mkdtempSync(join(tmpdir(), 'dsh-web-claim-'))
+    await bootProvider([], shared)
+
+    const other = await bootProvider(['--port', '8080'], shared)
+    expect(other.values).toEqual({ port: 8080, trustedHosts: [] })
+    expect(other.observed.exits).toEqual([])
   })
 
   it('prints its own help and leaves the consumer pending', async () => {

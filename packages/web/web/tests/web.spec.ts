@@ -186,6 +186,22 @@ describe('WebRuntime maxResults enforcement', () => {
     expect(result.sources).toHaveLength(2)
     expect(result.truncated).toBe(false)
   })
+
+  it('probes a named provider without using configured selection', async () => {
+    const { web } = await mountWeb({ searchProvider: 'exa' })
+    web.registerSearchProvider(makeSearchProvider('exa', available, () => Promise.resolve(searchResult('exa'))))
+    web.registerSearchProvider(makeSearchProvider('tavily', available, () => Promise.resolve(
+      searchResult('tavily', { sources: [{ url: 'https://example.com' }] }),
+    )))
+    await expect(web.probeSearch('tavily')).resolves.toEqual({ providerId: 'tavily', sourceCount: 1 })
+  })
+
+  it('probeSearch rejects a missing or unavailable provider id', async () => {
+    const { web } = await mountWeb()
+    web.registerSearchProvider(makeSearchProvider('exa', unavailable, () => Promise.resolve(searchResult('exa'))))
+    await expect(web.probeSearch('tavily')).rejects.toThrow(expect.objectContaining({ code: 'WEB_PROVIDER_CONFIGURED_MISSING' }))
+    await expect(web.probeSearch('exa')).rejects.toThrow(expect.objectContaining({ code: 'WEB_PROVIDER_CONFIGURED_UNAVAILABLE' }))
+  })
 })
 
 describe('WebRuntime fetch capability', () => {

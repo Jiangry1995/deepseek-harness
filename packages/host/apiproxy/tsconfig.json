@@ -96,6 +96,9 @@
       "path": "../../extensions/cordis-host-runner"
     },
     {
+      "path": "../../web/browser"
+    },
+    {
       "path": "../../runtime-diagnostics/invariants"
     },
     {

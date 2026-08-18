@@ -224,6 +224,14 @@ export class FakeApiClient implements IApiClient {
     discoverModels: payload => this.record('llm.discoverModels', payload, Promise.resolve(ok({ models: [] }))),
   }
 
+  /** Return a deterministic Web provider probe through the same call recorder. */
+  readonly web: IApiClient['web'] = {
+    probeSearch: payload => this.record('web.probeSearch', payload, Promise.resolve(ok({
+      providerId: payload.providerId,
+      sourceCount: 1,
+    }))),
+  }
+
   /** When true, streams never fire onOpen (misbehaving-carrier material for the handshake timeout guard). */
   suppressStreamOpen = false
 

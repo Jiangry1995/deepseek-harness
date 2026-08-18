@@ -509,14 +509,13 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     ctx.baseUrl = pathToFileURL(profileDir).href + '/'
     // This direct Loader harness supplies the same root-path capability as app-boot.
     ctx.provide('dshHomePath', dshHomePath)
-    // A host with no command line still provides one: the web bundle's startup
-    // row releases the rows waiting on it, and with no arguments each starts on
-    // the values this scaffold composed above. An exit request can only come
-    // from a rejected argument, which a fixed empty list has none of.
+    // The web startup row claims its command-line address before loader patches
+    // configure the server. Pin port 0 here as well as in the webserver patch so
+    // a running developer Web profile cannot block an isolated scaffold.
     provideCmdline(ctx, {
-      args: [],
+      args: ['--port', '0'],
       exit: (code) => {
-        throw new Error(`web e2e scaffold: the web app requested exit ${String(code)} with no arguments to reject`)
+        throw new Error(`web e2e scaffold: the web app requested exit ${String(code)} for --port 0`)
       },
     })
     await ctx.plugin(Loader)

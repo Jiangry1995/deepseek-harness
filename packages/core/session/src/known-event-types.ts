@@ -60,5 +60,8 @@ export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
   'turn/end',
   'turn/start',
   'user/message',
+  'vision/fallback-request',
+  'vision/fallback-result',
   'web/deepseek-search-llm-request',
+  'web/networking',
 ])

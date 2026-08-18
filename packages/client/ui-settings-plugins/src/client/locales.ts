@@ -10,7 +10,11 @@ export type PluginsSettingsLocaleKey =
   | 'agentLoopTitle' | 'agentLoopDescription' | 'agentLoopMaxParallel' | 'agentLoopMaxParallelHint'
   | 'webSearchTitle' | 'webSearchDescription'
   | 'webSearchApiKey' | 'webSearchApiKeyHint' | 'webSearchApiKeySet' | 'webSearchApiKeyUnset'
+  | 'webSearchApiKeyShow' | 'webSearchApiKeyHide'
   | 'webSearchBaseUrl' | 'webSearchBaseUrlHint' | 'webSearchMaxUses' | 'webSearchMaxUsesHint'
+  | 'webProviderApiKeyEnv' | 'webProviderApiKeyEnvHint'
+  | 'webProviderTest' | 'webProviderTesting' | 'webProviderTestOk' | 'webProviderTestFailed' | 'webProviderTestNeedKey'
+  | 'tavilyTitle' | 'tavilyDescription' | 'firecrawlTitle' | 'firecrawlDescription'
 
 /** English copy. */
 export const en: Record<PluginsSettingsLocaleKey, string> = {
@@ -47,10 +51,23 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   webSearchApiKeyHint: 'Stored outside the settings file. Leave blank to keep the current key.',
   webSearchApiKeySet: 'A key is configured.',
   webSearchApiKeyUnset: 'No key is configured; search is unavailable until one is.',
+  webSearchApiKeyShow: 'Show API key',
+  webSearchApiKeyHide: 'Hide API key',
   webSearchBaseUrl: 'Endpoint',
   webSearchBaseUrlHint: 'Leave blank to use the provider default.',
   webSearchMaxUses: 'Max searches per request',
   webSearchMaxUsesHint: 'How many times one request may search before it must answer.',
+  webProviderApiKeyEnv: 'Key environment variable',
+  webProviderApiKeyEnvHint: 'Which environment variable the provider reads its key from.',
+  webProviderTest: 'Test',
+  webProviderTesting: 'Testing…',
+  webProviderTestOk: 'Connection succeeded.',
+  webProviderTestFailed: 'Connection failed.',
+  webProviderTestNeedKey: 'Save an API key before testing.',
+  tavilyTitle: 'Tavily',
+  tavilyDescription: 'Tavily search provider (pair with a fetch provider for page retrieval).',
+  firecrawlTitle: 'Firecrawl',
+  firecrawlDescription: 'Firecrawl search and page scrape providers.',
 }
 
 /** Simplified Chinese copy. */
@@ -88,8 +105,21 @@ export const zh: Record<PluginsSettingsLocaleKey, string> = {
   webSearchApiKeyHint: '不写入设置文件。留空表示保持当前密钥。',
   webSearchApiKeySet: '已配置密钥。',
   webSearchApiKeyUnset: '未配置密钥；配置之前搜索不可用。',
+  webSearchApiKeyShow: '显示 API Key',
+  webSearchApiKeyHide: '隐藏 API Key',
   webSearchBaseUrl: '接口地址',
   webSearchBaseUrlHint: '留空则使用提供方默认地址。',
   webSearchMaxUses: '单次请求最多搜索次数',
   webSearchMaxUsesHint: '一次请求在必须作答前最多可以搜索多少次。',
+  webProviderApiKeyEnv: '密钥环境变量名',
+  webProviderApiKeyEnvHint: '提供方从哪个环境变量读取密钥。',
+  webProviderTest: '测试',
+  webProviderTesting: '测试中…',
+  webProviderTestOk: '连接成功。',
+  webProviderTestFailed: '连接失败。',
+  webProviderTestNeedKey: '请先保存 API Key 再测试。',
+  tavilyTitle: 'Tavily',
+  tavilyDescription: 'Tavily 搜索提供方（页面抓取需搭配抓取提供方）。',
+  firecrawlTitle: 'Firecrawl',
+  firecrawlDescription: 'Firecrawl 搜索与页面抓取提供方。',
 }

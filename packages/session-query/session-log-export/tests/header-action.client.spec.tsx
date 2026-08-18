@@ -41,6 +41,7 @@ describe('Session export Header action', () => {
   it('renders the 111×32 text capsule and downloads through the shared controller', async () => {
     const b = bench()
     const button = b.view.getByRole('button', { name: 'Session log' })
+    expect(button.getAttribute('aria-label')).toBe('Session log')
     expect(button.querySelector('svg')).not.toBeNull()
     fireEvent.click(button)
     await waitFor(() => { expect(b.request).toHaveBeenCalledWith(SID) })
