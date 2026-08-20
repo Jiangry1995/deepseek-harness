@@ -10,6 +10,21 @@ function setPage(html: string): void {
   document.body.innerHTML = html
 }
 
+/** Give one element a layout box, which jsdom otherwise reports as empty. */
+function setRect(element: HTMLElement, x: number, y: number, width: number, height: number): void {
+  element.getBoundingClientRect = (): DOMRect => ({
+    x,
+    y,
+    width,
+    height,
+    top: y,
+    left: x,
+    right: x + width,
+    bottom: y + height,
+    toJSON: () => ({ x, y, width, height }),
+  })
+}
+
 afterEach(() => {
   document.body.innerHTML = ''
   Reflect.deleteProperty(document.body, 'innerText')
@@ -249,6 +264,28 @@ describe('current-page extraction', () => {
     expect(page.text).not.toContain('secret')
     expect(page.text).not.toContain('123456')
     expect(page.text).not.toContain('4111111111111111')
+  })
+
+  it('exposes placement and accent fill for compact icon controls', () => {
+    setPage(`
+      <button aria-label="删除"></button>
+      <button aria-label="发送" id="send"></button>
+    `)
+    const remove = document.querySelectorAll('button')[0]!
+    const send = document.querySelector<HTMLElement>('#send')!
+    setRect(remove, 1144, 812, 32, 32)
+    setRect(send, 1184, 812, 32, 32)
+    send.style.backgroundColor = 'rgb(64, 128, 255)'
+
+    const page = readVisiblePage()
+    expect(page.actions.find(action => action.label === '发送')).toMatchObject({
+      rect: { x: 1184, y: 812, width: 32, height: 32 },
+      accent: true,
+    })
+    expect(page.actions.find(action => action.label === '删除')).toMatchObject({
+      rect: { x: 1144, y: 812, width: 32, height: 32 },
+    })
+    expect(page.actions.find(action => action.label === '删除')?.accent).toBeUndefined()
   })
 })
 

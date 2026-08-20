@@ -3,9 +3,17 @@
 /** Protocol channel shared by the Web Client, content script, and Service Worker. */
 export const BROWSER_EXTENSION_CHANNEL = 'dsh-browser-extension'
 /** Protocol version shared by the Web Client, content script, and Service Worker. */
-export const BROWSER_EXTENSION_PROTOCOL_VERSION = 5
+export const BROWSER_EXTENSION_PROTOCOL_VERSION = 6
 /** Maximum serialized UTF-8 bytes accepted for one complete page-read result. */
 export const BROWSER_PAGE_RESULT_MAX_BYTES = 96 * 1024
+/** Maximum serialized UTF-8 bytes accepted for one page-inspect result. */
+export const BROWSER_INSPECT_RESULT_MAX_BYTES = 48 * 1024
+/** Maximum network entries retained for one inspect snapshot. */
+export const BROWSER_INSPECT_NETWORK_MAX = 40
+/** Maximum console entries retained for one inspect snapshot. */
+export const BROWSER_INSPECT_CONSOLE_MAX = 40
+/** Maximum characters retained for one inspect URL or console line. */
+export const BROWSER_INSPECT_TEXT_MAX = 500
 /** Maximum scroll containers returned by one page read. */
 export const BROWSER_PAGE_SCROLL_TARGET_MAX = 40
 /** Maximum native options returned for one select field. */
@@ -68,6 +76,18 @@ export interface BridgePageField {
   options?: BridgePageOption[]
 }
 
+/** Rounded viewport-relative placement of one element. */
+export interface BridgePageRect {
+  /** Distance in CSS pixels from the viewport left edge. */
+  x: number
+  /** Distance in CSS pixels from the viewport top edge. */
+  y: number
+  /** Rendered width in CSS pixels. */
+  width: number
+  /** Rendered height in CSS pixels. */
+  height: number
+}
+
 /** One visible element that can be clicked in the current document. */
 export interface BridgePageAction {
   /** Opaque document-bound element reference used by page action tools. */
@@ -76,6 +96,10 @@ export interface BridgePageAction {
   role: string
   /** Visible or accessible element label. */
   label: string
+  /** Placement of an unlabeled or compact control, so siblings remain distinguishable. */
+  rect?: BridgePageRect
+  /** Whether the control uses a saturated non-gray fill, matching primary or colored send buttons. */
+  accent?: boolean
   /** Whether the element currently rejects activation. */
   disabled: boolean
   /** Whether the element intersects the current viewport. */
@@ -125,6 +149,58 @@ export interface BridgePageContent {
   truncated: boolean
 }
 
+/** One observed page network call captured after the MAIN-world probe was installed. */
+export interface BridgeNetworkEntry {
+  /** Epoch milliseconds when the request finished or failed. */
+  at: number
+  /** Browser API that produced the observation. */
+  source: 'fetch' | 'xhr'
+  /** HTTP method. */
+  method: string
+  /** Sanitized request URL without credentials or secret query values. */
+  url: string
+  /** HTTP status when the call completed. */
+  status?: number
+  /** Whether the HTTP status was in the 2xx range. */
+  ok?: boolean
+  /** Elapsed milliseconds from send to completion. */
+  durationMs?: number
+  /** Failure text when the call did not complete with a response. */
+  error?: string
+}
+
+/** One observed page console or error event. */
+export interface BridgeConsoleEntry {
+  /** Epoch milliseconds when the message was recorded. */
+  at: number
+  /** Console severity. */
+  level: 'log' | 'info' | 'warn' | 'error' | 'debug'
+  /** Bounded rendered message text. */
+  text: string
+}
+
+/** Bounded Network/Console snapshot returned by the page probe. */
+export interface BridgePageInspectContent {
+  /** Whether the MAIN-world fetch/XHR/console probe answered this inspect. */
+  hooked: boolean
+  /** Epoch milliseconds when the probe was first installed in this document. */
+  hookedAt?: number
+  /** Recent page network calls. */
+  network: BridgeNetworkEntry[]
+  /** Recent page console messages. */
+  console: BridgeConsoleEntry[]
+  /** Network entries dropped because the ring buffer was full. */
+  omittedNetwork: number
+  /** Console entries dropped because the ring buffer was full. */
+  omittedConsole: number
+}
+
+/** Active-tab metadata plus a bounded page inspect snapshot. */
+export interface BridgePageInspect extends BridgePageInspectContent {
+  /** Active browser tab from which the inspect was taken. */
+  tab: BridgeTab
+}
+
 /** Discrete scroll movement accepted across the bridge. */
 export type BridgeScrollMovement =
   | 'line-up'
@@ -140,22 +216,27 @@ export type BridgeScrollMovement =
   | 'left-edge'
   | 'right-edge'
 
+/** Named keys accepted without a shortcut modifier. */
+export const NAMED_PRESS_KEYS = [
+  'Enter', 'Escape', 'Tab', 'Space',
+  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+  'Home', 'End', 'PageUp', 'PageDown', 'Backspace', 'Delete',
+] as const
+
+/** Letter keys accepted only with Control, Alt, or Meta. */
+export const LETTER_PRESS_KEYS = [
+  'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+  'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+] as const
+
+/** Digit keys accepted only with Control, Alt, or Meta. */
+export const DIGIT_PRESS_KEYS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'] as const
+
+/** Complete bounded keyboard allowlist. */
+export const PRESS_KEY_VALUES = [...NAMED_PRESS_KEYS, ...LETTER_PRESS_KEYS, ...DIGIT_PRESS_KEYS] as const
+
 /** Keys accepted by the bounded keyboard operation. */
-export type BridgePressKey =
-  | 'Enter'
-  | 'Escape'
-  | 'Tab'
-  | 'Space'
-  | 'ArrowUp'
-  | 'ArrowDown'
-  | 'ArrowLeft'
-  | 'ArrowRight'
-  | 'Home'
-  | 'End'
-  | 'PageUp'
-  | 'PageDown'
-  | 'Backspace'
-  | 'Delete'
+export type BridgePressKey = (typeof PRESS_KEY_VALUES)[number]
 
 /** Page-element operations accepted only for references from the latest page read. */
 export type BridgePageActionOperation =
@@ -225,6 +306,7 @@ export type BridgeOperation =
   | { kind: 'open-tab'; url: string; active: boolean }
   | { kind: 'list-tabs' }
   | { kind: 'read-page'; tabId?: number }
+  | { kind: 'inspect-page'; tabId?: number; reset: boolean }
   | BridgePageActionOperation
   | {
     kind: 'wait-page'
@@ -242,6 +324,7 @@ export type BridgeOperationResult =
   | { kind: 'open-tab'; tab: BridgeTab }
   | { kind: 'list-tabs'; tabs: BridgeTab[] }
   | { kind: 'read-page'; page: BridgePage }
+  | { kind: 'inspect-page'; inspect: BridgePageInspect }
   | { kind: 'click-page-element'; receipt: BridgePageActionReceipt }
   | { kind: 'fill-page-element'; receipt: BridgePageActionReceipt }
   | { kind: 'select-page-option'; receipt: BridgePageActionReceipt }
@@ -320,11 +403,8 @@ const SCROLL_MOVEMENTS = new Set<BridgeScrollMovement>([
   'page-up', 'page-down', 'page-left', 'page-right',
   'top', 'bottom', 'left-edge', 'right-edge',
 ])
-const PRESS_KEYS = new Set<BridgePressKey>([
-  'Enter', 'Escape', 'Tab', 'Space',
-  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-  'Home', 'End', 'PageUp', 'PageDown', 'Backspace', 'Delete',
-])
+const PRESS_KEYS = new Set<BridgePressKey>(PRESS_KEY_VALUES)
+const NAMED_PRESS_KEY_SET = new Set<string>(NAMED_PRESS_KEYS)
 const BRIDGE_ERROR_CODES = new Set<BridgeError['code']>([
   'BROWSER_INVALID_REQUEST',
   'BROWSER_TAB_NOT_FOUND',
@@ -344,6 +424,23 @@ const BRIDGE_ERROR_CODES = new Set<BridgeError['code']>([
 /** Return whether an untrusted bridge value is a plain record. */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/** Return whether one press operation carries a page-shortcut modifier. */
+function hasShortcutModifier(modifiers: { ctrl?: boolean; alt?: boolean; meta?: boolean }): boolean {
+  return modifiers.ctrl === true || modifiers.alt === true || modifiers.meta === true
+}
+
+/**
+ * Return whether one key is allowed for the current modifier set.
+ * Named keys work alone. Letter and digit keys are page shortcuts and require Control, Alt, or Meta.
+ */
+function isAllowedPressKey(
+  key: unknown,
+  modifiers: { ctrl?: boolean; alt?: boolean; meta?: boolean },
+): key is BridgePressKey {
+  if (typeof key !== 'string' || !PRESS_KEYS.has(key as BridgePressKey)) return false
+  return NAMED_PRESS_KEY_SET.has(key) || hasShortcutModifier(modifiers)
 }
 
 /** Return whether an untrusted value can identify a Chromium tab. */
@@ -438,6 +535,15 @@ function isBridgePageField(value: unknown): value is BridgePageField {
         && value.options.every(isBridgePageOption)))
 }
 
+/** Validate one optional element placement. */
+function isBridgePageRect(value: unknown): value is BridgePageRect {
+  return isRecord(value)
+    && Number.isFinite(value.x)
+    && Number.isFinite(value.y)
+    && isNonNegativeNumber(value.width)
+    && isNonNegativeNumber(value.height)
+}
+
 /** Validate one bounded clickable element summary. */
 function isBridgePageAction(value: unknown): value is BridgePageAction {
   return isRecord(value)
@@ -447,6 +553,8 @@ function isBridgePageAction(value: unknown): value is BridgePageAction {
     && value.role.length <= 32
     && typeof value.label === 'string'
     && value.label.length <= 160
+    && (value.rect === undefined || isBridgePageRect(value.rect))
+    && (value.accent === undefined || typeof value.accent === 'boolean')
     && typeof value.disabled === 'boolean'
     && typeof value.inViewport === 'boolean'
     && typeof value.focused === 'boolean'
@@ -496,6 +604,73 @@ export function isBridgePageContent(value: unknown): value is BridgePageContent 
     && value.scrollTargets.length <= BROWSER_PAGE_SCROLL_TARGET_MAX
     && value.scrollTargets.every(isBridgePageScrollTarget)
     && typeof value.truncated === 'boolean'
+}
+
+/** Validate one bounded network observation. */
+function isBridgeNetworkEntry(value: unknown): value is BridgeNetworkEntry {
+  return isRecord(value)
+    && typeof value.at === 'number'
+    && Number.isSafeInteger(value.at)
+    && value.at >= 0
+    && (value.source === 'fetch' || value.source === 'xhr')
+    && typeof value.method === 'string'
+    && value.method.length > 0
+    && value.method.length <= 16
+    && typeof value.url === 'string'
+    && value.url.length <= BROWSER_INSPECT_TEXT_MAX
+    && (value.status === undefined
+      || (typeof value.status === 'number' && Number.isSafeInteger(value.status) && value.status >= 0 && value.status <= 999))
+    && (value.ok === undefined || typeof value.ok === 'boolean')
+    && (value.durationMs === undefined
+      || (typeof value.durationMs === 'number' && Number.isSafeInteger(value.durationMs) && value.durationMs >= 0))
+    && (value.error === undefined || (typeof value.error === 'string' && value.error.length <= BROWSER_INSPECT_TEXT_MAX))
+}
+
+/** Validate one bounded console observation. */
+function isBridgeConsoleEntry(value: unknown): value is BridgeConsoleEntry {
+  return isRecord(value)
+    && typeof value.at === 'number'
+    && Number.isSafeInteger(value.at)
+    && value.at >= 0
+    && (value.level === 'log' || value.level === 'info' || value.level === 'warn' || value.level === 'error' || value.level === 'debug')
+    && typeof value.text === 'string'
+    && value.text.length <= BROWSER_INSPECT_TEXT_MAX
+}
+
+/**
+ * Validate inspect content returned directly by the active-page script.
+ * @param value - untrusted content-script result.
+ * @returns whether the value is one bounded inspect snapshot.
+ */
+export function isBridgePageInspectContent(value: unknown): value is BridgePageInspectContent {
+  return isRecord(value)
+    && typeof value.hooked === 'boolean'
+    && (value.hookedAt === undefined
+      || (typeof value.hookedAt === 'number' && Number.isSafeInteger(value.hookedAt) && value.hookedAt >= 0))
+    && Array.isArray(value.network)
+    && value.network.length <= BROWSER_INSPECT_NETWORK_MAX
+    && value.network.every(isBridgeNetworkEntry)
+    && Array.isArray(value.console)
+    && value.console.length <= BROWSER_INSPECT_CONSOLE_MAX
+    && value.console.every(isBridgeConsoleEntry)
+    && typeof value.omittedNetwork === 'number'
+    && Number.isSafeInteger(value.omittedNetwork)
+    && value.omittedNetwork >= 0
+    && typeof value.omittedConsole === 'number'
+    && Number.isSafeInteger(value.omittedConsole)
+    && value.omittedConsole >= 0
+}
+
+/**
+ * Validate one complete bounded page-inspect result.
+ * @param value - untrusted extension result.
+ * @returns whether the value is one complete bounded inspect result.
+ */
+export function isBridgePageInspect(value: unknown): value is BridgePageInspect {
+  return isRecord(value)
+    && isBridgeTab(value.tab)
+    && isBridgePageInspectContent(value)
+    && jsonByteLength(value) <= BROWSER_INSPECT_RESULT_MAX_BYTES
 }
 
 /**
@@ -600,6 +775,8 @@ export function isBridgeOperation(value: unknown): value is BridgeOperation {
     case 'open-tab': return typeof value.url === 'string' && typeof value.active === 'boolean'
     case 'list-tabs': return true
     case 'read-page': return value.tabId === undefined || isSafeTabId(value.tabId)
+    case 'inspect-page': return (value.tabId === undefined || isSafeTabId(value.tabId))
+      && typeof value.reset === 'boolean'
     case 'click-page-element':
     case 'focus-page-element': return isPageId(value.pageId) && isPageRef(value.ref)
     case 'fill-page-element': return isPageId(value.pageId)
@@ -617,13 +794,16 @@ export function isBridgeOperation(value: unknown): value is BridgeOperation {
       && SCROLL_MOVEMENTS.has(value.movement as BridgeScrollMovement)
     case 'press-page-key': return isPageId(value.pageId)
       && isPageRef(value.ref)
-      && typeof value.key === 'string'
-      && PRESS_KEYS.has(value.key as BridgePressKey)
       && isRecord(value.modifiers)
       && (value.modifiers.ctrl === undefined || typeof value.modifiers.ctrl === 'boolean')
       && (value.modifiers.alt === undefined || typeof value.modifiers.alt === 'boolean')
       && (value.modifiers.shift === undefined || typeof value.modifiers.shift === 'boolean')
       && (value.modifiers.meta === undefined || typeof value.modifiers.meta === 'boolean')
+      && isAllowedPressKey(value.key, {
+        ctrl: value.modifiers.ctrl === true,
+        alt: value.modifiers.alt === true,
+        meta: value.modifiers.meta === true,
+      })
       && typeof value.repeat === 'number'
       && Number.isSafeInteger(value.repeat)
       && value.repeat >= 1
@@ -654,6 +834,7 @@ function isBridgeOperationResult(value: unknown): value is BridgeOperationResult
     case 'list-tabs': return Array.isArray(value.tabs) && value.tabs.every(isBridgeTab)
     case 'read-page':
     case 'wait-page': return isBridgePage(value.page)
+    case 'inspect-page': return isBridgePageInspect(value.inspect)
     case 'click-page-element':
     case 'fill-page-element':
     case 'select-page-option':

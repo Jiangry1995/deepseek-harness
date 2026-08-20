@@ -1,20 +1,7 @@
 /** Maximum serialized UTF-8 bytes accepted for one complete page-read result. */
 const BROWSER_PAGE_RESULT_MAX_BYTES = 96 * 1024;
-const SCROLL_MOVEMENTS = new Set([
-	"line-up",
-	"line-down",
-	"line-left",
-	"line-right",
-	"page-up",
-	"page-down",
-	"page-left",
-	"page-right",
-	"top",
-	"bottom",
-	"left-edge",
-	"right-edge"
-]);
-const PRESS_KEYS = new Set([
+/** Named keys accepted without a shortcut modifier. */
+const NAMED_PRESS_KEYS = [
 	"Enter",
 	"Escape",
 	"Tab",
@@ -29,7 +16,71 @@ const PRESS_KEYS = new Set([
 	"PageDown",
 	"Backspace",
 	"Delete"
+];
+/** Letter keys accepted only with Control, Alt, or Meta. */
+const LETTER_PRESS_KEYS = [
+	"a",
+	"b",
+	"c",
+	"d",
+	"e",
+	"f",
+	"g",
+	"h",
+	"i",
+	"j",
+	"k",
+	"l",
+	"m",
+	"n",
+	"o",
+	"p",
+	"q",
+	"r",
+	"s",
+	"t",
+	"u",
+	"v",
+	"w",
+	"x",
+	"y",
+	"z"
+];
+/** Digit keys accepted only with Control, Alt, or Meta. */
+const DIGIT_PRESS_KEYS = [
+	"0",
+	"1",
+	"2",
+	"3",
+	"4",
+	"5",
+	"6",
+	"7",
+	"8",
+	"9"
+];
+/** Complete bounded keyboard allowlist. */
+const PRESS_KEY_VALUES = [
+	...NAMED_PRESS_KEYS,
+	...LETTER_PRESS_KEYS,
+	...DIGIT_PRESS_KEYS
+];
+const SCROLL_MOVEMENTS = new Set([
+	"line-up",
+	"line-down",
+	"line-left",
+	"line-right",
+	"page-up",
+	"page-down",
+	"page-left",
+	"page-right",
+	"top",
+	"bottom",
+	"left-edge",
+	"right-edge"
 ]);
+const PRESS_KEYS = new Set(PRESS_KEY_VALUES);
+const NAMED_PRESS_KEY_SET = new Set(NAMED_PRESS_KEYS);
 const BRIDGE_ERROR_CODES = new Set([
 	"BROWSER_INVALID_REQUEST",
 	"BROWSER_TAB_NOT_FOUND",
@@ -49,6 +100,18 @@ const BRIDGE_ERROR_CODES = new Set([
 function isRecord$1(value) {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+/** Return whether one press operation carries a page-shortcut modifier. */
+function hasShortcutModifier(modifiers) {
+	return modifiers.ctrl === true || modifiers.alt === true || modifiers.meta === true;
+}
+/**
+* Return whether one key is allowed for the current modifier set.
+* Named keys work alone. Letter and digit keys are page shortcuts and require Control, Alt, or Meta.
+*/
+function isAllowedPressKey(key, modifiers) {
+	if (typeof key !== "string" || !PRESS_KEYS.has(key)) return false;
+	return NAMED_PRESS_KEY_SET.has(key) || hasShortcutModifier(modifiers);
+}
 /** Return whether an untrusted value can identify a Chromium tab. */
 function isSafeTabId(value) {
 	return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
@@ -67,7 +130,7 @@ function isNonNegativeNumber(value) {
 }
 /** Match the shared protocol envelope and an expected message direction. */
 function hasEnvelope(value, direction) {
-	return value.channel === "dsh-browser-extension" && value.version === 5 && value.direction === direction;
+	return value.channel === "dsh-browser-extension" && value.version === 6 && value.direction === direction;
 }
 /** Validate a normalized tab received across the isolated-world bridge. */
 function isBridgeTab(value) {
@@ -94,9 +157,13 @@ function isBridgePageViewport(value) {
 function isBridgePageField(value) {
 	return isRecord$1(value) && isPageRef(value.ref) && typeof value.label === "string" && value.label.length <= 160 && typeof value.type === "string" && value.type.length <= 64 && typeof value.value === "string" && value.value.length <= 3e4 && (value.checked === void 0 || typeof value.checked === "boolean") && typeof value.disabled === "boolean" && typeof value.readOnly === "boolean" && typeof value.required === "boolean" && typeof value.inViewport === "boolean" && typeof value.focused === "boolean" && (value.context === void 0 || typeof value.context === "string" && value.context.length <= 200) && (value.options === void 0 || Array.isArray(value.options) && value.options.length <= 40 && value.options.every(isBridgePageOption));
 }
+/** Validate one optional element placement. */
+function isBridgePageRect(value) {
+	return isRecord$1(value) && Number.isFinite(value.x) && Number.isFinite(value.y) && isNonNegativeNumber(value.width) && isNonNegativeNumber(value.height);
+}
 /** Validate one bounded clickable element summary. */
 function isBridgePageAction(value) {
-	return isRecord$1(value) && isPageRef(value.ref) && typeof value.role === "string" && value.role.length > 0 && value.role.length <= 32 && typeof value.label === "string" && value.label.length <= 160 && typeof value.disabled === "boolean" && typeof value.inViewport === "boolean" && typeof value.focused === "boolean" && (value.context === void 0 || typeof value.context === "string" && value.context.length <= 200) && (value.href === void 0 || typeof value.href === "string" && value.href.length <= 2e3) && (value.checked === void 0 || typeof value.checked === "boolean") && (value.selected === void 0 || typeof value.selected === "boolean") && (value.expanded === void 0 || typeof value.expanded === "boolean") && (value.pressed === void 0 || typeof value.pressed === "boolean");
+	return isRecord$1(value) && isPageRef(value.ref) && typeof value.role === "string" && value.role.length > 0 && value.role.length <= 32 && typeof value.label === "string" && value.label.length <= 160 && (value.rect === void 0 || isBridgePageRect(value.rect)) && (value.accent === void 0 || typeof value.accent === "boolean") && typeof value.disabled === "boolean" && typeof value.inViewport === "boolean" && typeof value.focused === "boolean" && (value.context === void 0 || typeof value.context === "string" && value.context.length <= 200) && (value.href === void 0 || typeof value.href === "string" && value.href.length <= 2e3) && (value.checked === void 0 || typeof value.checked === "boolean") && (value.selected === void 0 || typeof value.selected === "boolean") && (value.expanded === void 0 || typeof value.expanded === "boolean") && (value.pressed === void 0 || typeof value.pressed === "boolean");
 }
 /** Validate one actually scrollable container summary. */
 function isBridgePageScrollTarget(value) {
@@ -109,6 +176,30 @@ function isBridgePageScrollTarget(value) {
 */
 function isBridgePageContent(value) {
 	return isRecord$1(value) && isPageId(value.pageId) && isPageId(value.documentId) && typeof value.revision === "number" && Number.isSafeInteger(value.revision) && value.revision >= 0 && isBridgePageViewport(value.viewport) && typeof value.text === "string" && value.text.length <= 3e4 && Array.isArray(value.fields) && value.fields.length <= 80 && value.fields.every(isBridgePageField) && Array.isArray(value.actions) && value.actions.length <= 120 && value.actions.every(isBridgePageAction) && Array.isArray(value.scrollTargets) && value.scrollTargets.length <= 40 && value.scrollTargets.every(isBridgePageScrollTarget) && typeof value.truncated === "boolean";
+}
+/** Validate one bounded network observation. */
+function isBridgeNetworkEntry(value) {
+	return isRecord$1(value) && typeof value.at === "number" && Number.isSafeInteger(value.at) && value.at >= 0 && (value.source === "fetch" || value.source === "xhr") && typeof value.method === "string" && value.method.length > 0 && value.method.length <= 16 && typeof value.url === "string" && value.url.length <= 500 && (value.status === void 0 || typeof value.status === "number" && Number.isSafeInteger(value.status) && value.status >= 0 && value.status <= 999) && (value.ok === void 0 || typeof value.ok === "boolean") && (value.durationMs === void 0 || typeof value.durationMs === "number" && Number.isSafeInteger(value.durationMs) && value.durationMs >= 0) && (value.error === void 0 || typeof value.error === "string" && value.error.length <= 500);
+}
+/** Validate one bounded console observation. */
+function isBridgeConsoleEntry(value) {
+	return isRecord$1(value) && typeof value.at === "number" && Number.isSafeInteger(value.at) && value.at >= 0 && (value.level === "log" || value.level === "info" || value.level === "warn" || value.level === "error" || value.level === "debug") && typeof value.text === "string" && value.text.length <= 500;
+}
+/**
+* Validate inspect content returned directly by the active-page script.
+* @param value - untrusted content-script result.
+* @returns whether the value is one bounded inspect snapshot.
+*/
+function isBridgePageInspectContent(value) {
+	return isRecord$1(value) && typeof value.hooked === "boolean" && (value.hookedAt === void 0 || typeof value.hookedAt === "number" && Number.isSafeInteger(value.hookedAt) && value.hookedAt >= 0) && Array.isArray(value.network) && value.network.length <= 40 && value.network.every(isBridgeNetworkEntry) && Array.isArray(value.console) && value.console.length <= 40 && value.console.every(isBridgeConsoleEntry) && typeof value.omittedNetwork === "number" && Number.isSafeInteger(value.omittedNetwork) && value.omittedNetwork >= 0 && typeof value.omittedConsole === "number" && Number.isSafeInteger(value.omittedConsole) && value.omittedConsole >= 0;
+}
+/**
+* Validate one complete bounded page-inspect result.
+* @param value - untrusted extension result.
+* @returns whether the value is one complete bounded inspect result.
+*/
+function isBridgePageInspect(value) {
+	return isRecord$1(value) && isBridgeTab(value.tab) && isBridgePageInspectContent(value) && jsonByteLength(value) <= 49152;
 }
 /**
 * Validate one page action confirmation received from the content script.
@@ -153,12 +244,17 @@ function isBridgeOperation(value) {
 		case "open-tab": return typeof value.url === "string" && typeof value.active === "boolean";
 		case "list-tabs": return true;
 		case "read-page": return value.tabId === void 0 || isSafeTabId(value.tabId);
+		case "inspect-page": return (value.tabId === void 0 || isSafeTabId(value.tabId)) && typeof value.reset === "boolean";
 		case "click-page-element":
 		case "focus-page-element": return isPageId(value.pageId) && isPageRef(value.ref);
 		case "fill-page-element": return isPageId(value.pageId) && isPageRef(value.ref) && typeof value.value === "string" && value.value.length <= 1e4 && typeof value.submit === "boolean";
 		case "select-page-option": return isPageId(value.pageId) && isPageRef(value.ref) && typeof value.value === "string" && value.value.length <= 1e3;
 		case "scroll-page": return isPageId(value.pageId) && (value.ref === void 0 || isPageRef(value.ref)) && typeof value.movement === "string" && SCROLL_MOVEMENTS.has(value.movement);
-		case "press-page-key": return isPageId(value.pageId) && isPageRef(value.ref) && typeof value.key === "string" && PRESS_KEYS.has(value.key) && isRecord$1(value.modifiers) && (value.modifiers.ctrl === void 0 || typeof value.modifiers.ctrl === "boolean") && (value.modifiers.alt === void 0 || typeof value.modifiers.alt === "boolean") && (value.modifiers.shift === void 0 || typeof value.modifiers.shift === "boolean") && (value.modifiers.meta === void 0 || typeof value.modifiers.meta === "boolean") && typeof value.repeat === "number" && Number.isSafeInteger(value.repeat) && value.repeat >= 1 && value.repeat <= 20;
+		case "press-page-key": return isPageId(value.pageId) && isPageRef(value.ref) && isRecord$1(value.modifiers) && (value.modifiers.ctrl === void 0 || typeof value.modifiers.ctrl === "boolean") && (value.modifiers.alt === void 0 || typeof value.modifiers.alt === "boolean") && (value.modifiers.shift === void 0 || typeof value.modifiers.shift === "boolean") && (value.modifiers.meta === void 0 || typeof value.modifiers.meta === "boolean") && isAllowedPressKey(value.key, {
+			ctrl: value.modifiers.ctrl === true,
+			alt: value.modifiers.alt === true,
+			meta: value.modifiers.meta === true
+		}) && typeof value.repeat === "number" && Number.isSafeInteger(value.repeat) && value.repeat >= 1 && value.repeat <= 20;
 		case "wait-page": return (isPageId(value.pageId) || isSafeTabId(value.tabId)) && (value.pageId === void 0 || isPageId(value.pageId)) && (value.tabId === void 0 || isSafeTabId(value.tabId)) && isBridgeWaitCondition(value.condition) && typeof value.timeoutMs === "number" && Number.isSafeInteger(value.timeoutMs) && value.timeoutMs >= 100 && value.timeoutMs <= 3e4 && typeof value.stableMs === "number" && Number.isSafeInteger(value.stableMs) && value.stableMs >= 0 && value.stableMs <= 2e3;
 		case "activate-tab":
 		case "close-tab": return isSafeTabId(value.tabId);
@@ -261,6 +357,8 @@ const DSH_READ_PAGE_KIND = "dsh-read-page";
 const DSH_ACT_PAGE_KIND = "dsh-act-page";
 /** Message kind sent from the Service Worker for one in-tab wait. */
 const DSH_WAIT_PAGE_KIND = "dsh-wait-page";
+/** Message kind sent from the Service Worker for one Network/Console inspect. */
+const DSH_INSPECT_PAGE_KIND = "dsh-inspect-page";
 //#endregion
 //#region lib/types/extension/runtime.js
 /** Chromium API adapter for validated browser-extension bridge operations. */
@@ -361,6 +459,31 @@ function boundedPage(tab, content) {
 	if (!isBridgePage(page)) throw new Error("browser extension: page script returned an invalid result");
 	return page;
 }
+/** Return the serialized UTF-8 byte count of one complete inspect result. */
+function inspectByteLength(inspect) {
+	return new TextEncoder().encode(JSON.stringify(inspect)).byteLength;
+}
+/** Trim inspect buffers until the complete result fits the inspect byte budget. */
+function boundedInspect(tab, content) {
+	const inspect = {
+		tab,
+		hooked: content.hooked,
+		...content.hookedAt === void 0 ? {} : { hookedAt: content.hookedAt },
+		network: [...content.network],
+		console: [...content.console],
+		omittedNetwork: content.omittedNetwork,
+		omittedConsole: content.omittedConsole
+	};
+	while ((inspect.network.length > 0 || inspect.console.length > 0) && inspectByteLength(inspect) > 49152) if (inspect.network.length > 0) {
+		inspect.network.shift();
+		inspect.omittedNetwork += 1;
+	} else {
+		inspect.console.shift();
+		inspect.omittedConsole += 1;
+	}
+	if (!isBridgePageInspect(inspect)) throw new Error("browser extension: inspect result exceeds the inspect result limit");
+	return inspect;
+}
 /** Return whether Chromium's script failure reports missing authority for the target page. */
 function isPageAccessFailure(error) {
 	const message = error instanceof Error ? error.message : String(error);
@@ -409,6 +532,8 @@ const PAGE_READ_TIMEOUT_MS = 5e3;
 const PAGE_INJECT_TIMEOUT_MS = 5e3;
 /** Reader bundle injected into tabs that loaded before this extension generation. */
 const PAGE_READER_FILE = "page-content.js";
+/** MAIN-world probe injected so fetch/XHR/console can be observed. */
+const PAGE_PROBE_FILE = "page-probe.js";
 /** Tab shown in the side-panel header; read-page prefers this over the Service Worker's window guess. */
 let focusedTabId;
 /** Recent page snapshots mapped back to the tab that produced their document-bound refs. */
@@ -456,7 +581,14 @@ function askPageScript(tabs, tabId, message, timeoutMs = PAGE_READ_TIMEOUT_MS) {
 	return withTimeout(tabs.sendMessage(tabId, message), timeoutMs, "browser extension: page reader did not answer before timeout");
 }
 /** Inject the current page-content generation into one existing tab. */
-function injectPageScript(scripting, tabId) {
+async function injectPageScript(scripting, tabId) {
+	try {
+		await withTimeout(scripting.executeScript({
+			target: { tabId },
+			files: [PAGE_PROBE_FILE],
+			world: "MAIN"
+		}), PAGE_INJECT_TIMEOUT_MS, "browser extension: page probe injection did not return before timeout");
+	} catch {}
 	return withTimeout(scripting.executeScript({
 		target: { tabId },
 		files: [PAGE_READER_FILE]
@@ -469,6 +601,10 @@ function isCurrentReadResponse(value) {
 /** Return whether one page-script answer is a current action response or classified failure. */
 function isCurrentActionResponse(value) {
 	return isPageReaderFailure(value) || isPageActorSuccess(value);
+}
+/** Return whether one page-script answer is a current inspect response or classified failure. */
+function isCurrentInspectResponse(value) {
+	return isPageReaderFailure(value) || isPageReaderSuccess(value) && isBridgePageInspectContent(value.content);
 }
 /**
 * Read one tab, injecting the reader when the tab predates this extension generation.
@@ -514,6 +650,27 @@ async function readTabPage(tabs, scripting, tab) {
 async function readActivePage(tabs, scripting, tabId) {
 	return readTabPage(tabs, scripting, await resolveReadTab(tabs, tabId));
 }
+/** Inspect Network/Console observations from one resolved tab. */
+async function inspectTabPage(tabs, scripting, tab, reset) {
+	const normalized = normalizeTab(tab);
+	let response;
+	try {
+		response = await requestPageScript(tabs, scripting, normalized.id, {
+			kind: DSH_INSPECT_PAGE_KIND,
+			reset
+		}, isCurrentInspectResponse);
+	} catch (error) {
+		if (!isPageAccessFailure(error) && !isMissingPageReader(error)) throw error;
+		throw new PageAccessDeniedError("browser extension: this page cannot be inspected by extensions; open a normal http(s) page, then retry");
+	}
+	if (isPageReaderFailure(response)) throw new ClassifiedBridgeError(response.error.code, response.error.message);
+	if (!isPageReaderSuccess(response) || !isBridgePageInspectContent(response.content)) throw new Error("browser extension: page script returned an invalid inspect result");
+	return boundedInspect(normalized, response.content);
+}
+/** Inspect the requested tab, or the tab shown in the side panel. */
+async function inspectActivePage(tabs, scripting, tabId, reset) {
+	return inspectTabPage(tabs, scripting, await resolveReadTab(tabs, tabId), reset);
+}
 /** Execute one document-bound action in the tab shown by the side panel. */
 async function actOnActivePage(tabs, scripting, operation) {
 	const tab = normalizeTab(await resolveReadTab(tabs, pageTabIds.get(operation.pageId)));
@@ -529,6 +686,7 @@ async function actOnActivePage(tabs, scripting, operation) {
 	}
 	if (isPageReaderFailure(response)) throw new ClassifiedBridgeError(response.error.code, response.error.message);
 	if (!isPageActorSuccess(response)) throw new Error("browser extension: page script returned an invalid action result");
+	rememberPageTab(operation.pageId, tab.id);
 	return response.receipt;
 }
 /** Wait for one page condition, re-injecting after navigation destroys the page script. */
@@ -600,6 +758,10 @@ async function executeBridgeOperation(tabs, scripting, operation) {
 			kind: "read-page",
 			page: await readActivePage(tabs, scripting, operation.tabId)
 		};
+		case "inspect-page": return {
+			kind: "inspect-page",
+			inspect: await inspectActivePage(tabs, scripting, operation.tabId, operation.reset)
+		};
 		case "click-page-element":
 		case "fill-page-element":
 		case "select-page-option":
@@ -622,13 +784,10 @@ async function executeBridgeOperation(tabs, scripting, operation) {
 		}
 		case "wait-page": {
 			const mappedTabId = operation.pageId === void 0 ? void 0 : pageTabIds.get(operation.pageId);
-			if (operation.pageId !== void 0 && mappedTabId === void 0 && operation.tabId === void 0) throw new ClassifiedBridgeError("BROWSER_PAGE_STALE", "browser extension: page snapshot is no longer available; read the page again");
 			if (mappedTabId !== void 0 && operation.tabId !== void 0 && mappedTabId !== operation.tabId) throw new ClassifiedBridgeError("BROWSER_PAGE_STALE", "browser extension: page snapshot belongs to another tab; read the page again");
-			const waitTabId = mappedTabId ?? operation.tabId;
-			if (waitTabId === void 0) throw new InvalidBridgeRequestError("browser extension: wait-page requires pageId or tabId");
 			return {
 				kind: "wait-page",
-				page: await waitForTabPage(tabs, scripting, waitTabId, {
+				page: await waitForTabPage(tabs, scripting, normalizeTab(await resolveReadTab(tabs, mappedTabId ?? operation.tabId)).id, {
 					condition: operation.condition,
 					timeoutMs: operation.timeoutMs,
 					stableMs: operation.stableMs

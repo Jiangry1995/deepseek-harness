@@ -37,6 +37,7 @@ One page per subsystem of the DeepSeek Harness: what it is, the data structures 
 | [lsp.md](lsp.md) | the LSP navigation seam: `LspQueryRequest`/`Result`, `LspProvider`/`Service`, four operations, `LspError` |
 | [skills.md](skills.md) | the skill service: discovery priority, `SkillSummary`/`SkillDefinition`, session-prefix catalog, model-facing `skill` loading |
 | [compaction.md](compaction.md) | the compaction seam: the `compaction/*` session events, `CompactionResult`, the `CompactionEngine` interface |
+| [memory.md](memory.md) | the local markdown memory store: user/project roots, `MemoryStore`, extract/consolidate, and the memory tools |
 | [subagent.md](subagent.md) | the subagent seam: the named-provider registry, `SubagentStartRequest`/`Result`/`Run`, the start-time-vs-runtime capability split |
 | [web.md](web.md) | the web access seam: `WebSearchRequest`/`Result`, `WebFetchRequest`/`Result`, `WebFetchBody`, provider availability, `WebError` |
 | [browser.md](browser.md) | browser-tab routing: leased Web Client providers, closed tab operations/results, the isolated-world extension bridge, and `BrowserError` failures |

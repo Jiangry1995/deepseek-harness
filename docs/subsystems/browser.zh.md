@@ -14,7 +14,7 @@
 
 ## 操作与结果
 
-服务支持一组封闭操作：打开一个不含凭据的 HTTP(S) URL、列出标签页、读取当前或指定页面、点击、填写、选择、滚动、聚焦或按键操作一个已返回引用、等待页面条件、激活一个标签页，以及关闭一个标签页。页面读取会创建不透明 `pageId` 与元素 ref，扩展会为这份快照保留来源页签；再次读取或发生导航后，上一组坐标立即失效，操作完成结果必须回显请求中的坐标。每个结果都会重复操作判别字段，因此 Host 会拒绝针对错误操作返回的完成结果。
+服务支持一组封闭操作：打开一个不含凭据的 HTTP(S) URL、列出标签页、读取当前或指定页面、检查近期页面网络请求和 console 消息、点击、填写、选择、滚动、聚焦或按键操作一个已返回引用、等待页面条件、激活一个标签页，以及关闭一个标签页。页面读取会创建不透明 `pageId` 与元素 ref，扩展会为这份快照保留来源页签；检查操作读取 MAIN 世界探针捕获的 fetch/XHR 与 console 缓冲，不能打开原生 DevTools。再次读取或发生导航后，上一组坐标立即失效，操作完成结果必须回显请求中的坐标。每个结果都会重复操作判别字段，因此 Host 会拒绝针对错误操作返回的完成结果。
 
 ```ts type-equiv
 /** Browser tab data returned to model-facing consumers. */
@@ -47,6 +47,7 @@ type BrowserOperation =
   | BrowserOpenTabSpec
   | { kind: 'list-tabs' }
   | ({ kind: 'read-page' } & BrowserReadPageRequest)
+  | BrowserInspectPageSpec
   | ({ kind: 'click-page-element' } & BrowserPageTarget)
   | BrowserFillPageSpec
   | ({ kind: 'select-page-option' } & BrowserSelectPageRequest)
@@ -64,6 +65,7 @@ type BrowserOperationResult =
   | { kind: 'open-tab'; tab: BrowserTab }
   | { kind: 'list-tabs'; tabs: BrowserTab[] }
   | { kind: 'read-page'; page: BrowserPage }
+  | { kind: 'inspect-page'; inspect: BrowserPageInspect }
   | { kind: 'click-page-element'; receipt: BrowserPageActionReceipt }
   | { kind: 'fill-page-element'; receipt: BrowserPageActionReceipt }
   | { kind: 'select-page-option'; receipt: BrowserPageActionReceipt }
@@ -92,7 +94,7 @@ interface BrowserClientLease {
 
 ## 安全与失败行为
 
-扩展 manifest（元数据清单）授予侧栏、存储、Native Messaging、标签页、脚本注入和普通 HTTP(S) 页面访问权限；扩展页面的 frame/connect 策略仍只允许回环地址。后台监听器在接受 Host 操作前会要求消息具有本扩展的 sender id 和回环 sender URL。页面读取会排除密码、文件、隐藏字段、一次性验证码与支付敏感控件；页面操作只接受最近一次读取返回的 ref，拒绝已禁用或类型不兼容的元素，并且不接受任意选择器。页面桥两侧都会校验协议封装与操作专用数据，Host 还会独立校验 URL、标签页 id、页面坐标、所选提供方标识和结果判别字段。
+扩展 manifest（元数据清单）授予侧栏、存储、Native Messaging、标签页、脚本注入和普通 HTTP(S) 页面访问权限；扩展页面的 frame/connect 策略仍只允许回环地址。后台监听器在接受 Host 操作前会要求消息具有本扩展的 sender id 和回环 sender URL。页面读取会排除密码、文件、隐藏字段、一次性验证码与支付敏感控件。页面检查会在 MAIN 世界探针安装后捕获 fetch/XHR 元数据和 console 文本，不返回请求或响应体，也不能打开原生 DevTools。页面操作只接受最近一次读取返回的 ref，拒绝已禁用或类型不兼容的元素，并且不接受任意选择器。页面桥两侧都会校验协议封装与操作专用数据，Host 还会独立校验 URL、标签页 id、页面坐标、所选提供方标识和结果判别字段。
 
 这些检查限制可达性，但不会认证非回环 Harness 部署。因此，即使 HTTP 服务器信任其他权威，打包的提供方仍仅限回环地址。浏览器失败属于带稳定 `BrowserError` 错误代码的执行错误，扩展状态缺失绝不会移除面向模型的 schema。
 
@@ -171,6 +173,22 @@ async listTabs(signal: AbortSignal): Promise<BrowserTab[]>
  * @returns the tab metadata and its main-frame page snapshot.
  */
 async readPage(requestOrSignal: BrowserReadPageRequest | AbortSignal, signal?: AbortSignal): Promise<BrowserPage>
+
+/**
+ * Read recent page fetch/XHR calls and console messages captured after the in-page probe was installed.
+ * Native DevTools cannot be opened; this is the inspect surface available to the assistant.
+ * @param requestOrSignal - optional tab identity and reset flag, or the caller AbortSignal for the active tab.
+ * @param signal - caller cancellation when the first argument is a request record.
+ * @returns the tab metadata and bounded Network/Console snapshot.
+ */
+async inspectPage( requestOrSignal: BrowserInspectPageRequest | AbortSignal, signal?: AbortSignal, ): Promise<BrowserPageInspect>
+
+/**
+ * Validate and default one inspect-page request.
+ * @param request - optional tab identity and reset flag.
+ * @returns a complete provider operation.
+ */
+resolveInspectPage(request: BrowserInspectPageRequest): BrowserInspectPageSpec
 
 /**
  * Validate and brand a document-bound target returned by the latest page read.
@@ -274,7 +292,7 @@ async activateTab(tabId: number, signal: AbortSignal): Promise<BrowserTab>
 async closeTab(tabId: number, signal: AbortSignal): Promise<{ tabId: number; closed: true }>
 ```
 
-Source: [`packages/web/browser/src/index.ts:267`](../../packages/web/browser/src/index.ts)
+Source: [`packages/web/browser/src/index.ts:268`](../../packages/web/browser/src/index.ts)
 
 <a id="browser-events"></a>
 
@@ -295,5 +313,5 @@ Deliver one browser command to the selected Web Client provider.
 'browser/command'(command: BrowserCommand): void
 ```
 
-Source: [`packages/web/browser/src/types.ts:470`](../../packages/web/browser/src/types.ts)
+Source: [`packages/web/browser/src/types.ts:540`](../../packages/web/browser/src/types.ts)
 <!-- END GENERATED cordis-surface -->

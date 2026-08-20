@@ -20,16 +20,16 @@ Web Client 通过 Typert Remote 方法 `connect`、`heartbeat`、`disconnect` �
 
 每项操作都会选择最近出现的存活提供方，向该提供方发送一条 `browser/command` Remote 事件，并保留请求，直至提供方完成操作、调用方中止、配置的超时时间结束、提供方断开连接或服务被 dispose（资源释放）。服务只接受所选提供方返回的完成结果，并要求结果判别字段与操作匹配。
 
-`openTab` 接受不含凭据的绝对 HTTP(S) URL，`active` 默认为 `true`。`listTabs` 返回扩展当前浏览器窗口中的标签页。`readPage` 返回指定或当前网页标签页、渲染文本、当前可见的非敏感表单值及焦点状态、可点击元素、滚动目标、视口度量、快照 `pageId`、稳定的 `documentId`、文档 `revision`、元素 ref 和截断标记。`clickPage`、`fillPage`、`selectPage`、`scrollPage`、`focusPage` 与 `pressPage` 接受最近一次读取返回的 `pageId/ref` 对，Host 会要求完成回执回显同一对坐标。填写操作的 `submit` 默认为 `false`，提供方必须校验控件的实际值。`waitPage` 接受最近的 `pageId`，尚无快照时也可接受标签页 id；它等待文档变化、文本、URL 或加载稳定，然后返回新快照。`activateTab` 与 `closeTab` 接受浏览器返回的非负安全整数标签页 id。
+`openTab` 接受不含凭据的绝对 HTTP(S) URL，`active` 默认为 `true`。`listTabs` 返回扩展当前浏览器窗口中的标签页。`readPage` 返回指定或当前网页标签页、渲染文本、当前可见的非敏感表单值及焦点状态、可点击元素、滚动目标、视口度量、快照 `pageId`、稳定的 `documentId`、文档 `revision`、元素 ref 和截断标记。`inspectPage` 返回页面探针安装之后捕获的 fetch/XHR 请求和 console 消息；它不能打开原生 DevTools，也不返回请求或响应体。`clickPage`、`fillPage`、`selectPage`、`scrollPage`、`focusPage` 与 `pressPage` 接受最近一次读取返回的 `pageId/ref` 对，Host 会要求完成回执回显同一对坐标。填写操作的 `submit` 默认为 `false`，提供方必须校验控件的实际值。`pressPage` 接受命名按键，以及带 Control、Alt 或 Meta 的字母和数字页内快捷键。`waitPage` 接受最近的 `pageId`，尚无快照时也可接受标签页 id；它等待文档变化、文本、URL 或加载稳定，然后返回新快照。`activateTab` 与 `closeTab` 接受浏览器返回的非负安全整数标签页 id。
 
 ## 配置
 
 | 字段 | 默认值 | 含义 |
 |---|---:|---|
-| `requestTimeoutMs` | `15000` | Host 等待单次扩展完成结果的最长时间。 |
+| `requestTimeoutMs` | `15000` | Host 等待单次扩展完成结果的最长时间。`wait-page` 使用 `max(requestTimeoutMs, timeoutMs + 1500)`。 |
 | `clientLeaseMs` | `300000` | 从最近一次成功注册或心跳开始计算的提供方租约时长。足够覆盖 Chromium 把隐藏 iframe 定时器节流到大约每分钟一次的情况。 |
 
-Client 会在租约中收到这两个值。它会在租约时长过半时续租，并按照 Host 超时时间保留每个页面到扩展的请求。
+Client 会在租约中收到这两个值。它会在租约时长过半时续租，并按照 Host 超时时间减去 1000ms 余量来保留每个页面到扩展的请求。`wait-page` 在减去余量之前使用与本服务相同的 Host 公式，以便页内等待先结束。
 
 ## 错误
 

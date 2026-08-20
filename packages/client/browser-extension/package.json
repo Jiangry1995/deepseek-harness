@@ -58,6 +58,7 @@
     "extension/background.js",
     "extension/content.js",
     "extension/page-content.js",
+    "extension/page-probe.js",
     "extension/sidepanel.html",
     "extension/sidepanel.css",
     "extension/sidepanel.js",

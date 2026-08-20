@@ -56,6 +56,7 @@ describe('browser tools in the shipped Web composition', () => {
     const browserTools = requestHeader.tools?.filter(tool => tool.name.startsWith('browser_'))
     expect(browserTools?.map(tool => tool.name)).toEqual(expect.arrayContaining([
       'browser_read_page',
+      'browser_inspect',
       'browser_fill',
       'browser_scroll',
       'browser_wait_for',

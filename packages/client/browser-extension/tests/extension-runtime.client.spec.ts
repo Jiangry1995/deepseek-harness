@@ -135,6 +135,13 @@ describe('browser extension protocol guards', () => {
     })).toBe(false)
     expect(isBridgeOperation({ kind: 'wait-page', tabId: 9, condition: { kind: 'ready' }, timeoutMs: 50, stableMs: 0 })).toBe(false)
     expect(isBridgeOperation({ kind: 'press-page-key', pageId, ref: 'e1', key: 'a', modifiers: {}, repeat: 1 })).toBe(false)
+    expect(isBridgeOperation({
+      kind: 'press-page-key', pageId, ref: 'e1', key: 's', modifiers: { ctrl: true }, repeat: 1,
+    })).toBe(true)
+    expect(isBridgeOperation({ kind: 'press-page-key', pageId, ref: 'e1', key: 'F12', modifiers: {}, repeat: 1 })).toBe(false)
+    expect(isBridgeOperation({ kind: 'inspect-page', reset: false })).toBe(true)
+    expect(isBridgeOperation({ kind: 'inspect-page', tabId: 9, reset: true })).toBe(true)
+    expect(isBridgeOperation({ kind: 'inspect-page' })).toBe(false)
     expect(isBridgeOperation({ kind: 'click-page-element', pageId, ref: 'e1' })).toBe(true)
     expect(isBridgeOperation({ kind: 'fill-page-element', pageId, ref: 'e1', value: 'deepseek', submit: true })).toBe(true)
     expect(isBridgeOperation({ kind: 'select-page-option', pageId, ref: 'e2', value: '最新' })).toBe(true)
@@ -410,6 +417,45 @@ describe('Chromium tabs adapter', () => {
     })
   })
 
+  it('inspects recent page network and console observations from the focused tab', async () => {
+    rememberFocusedTab(12)
+    const tabs = tabsApi()
+    tabs.get.mockResolvedValue({ id: 12, windowId: 3, active: true, url: 'https://example.test/search' })
+    tabs.sendMessage.mockResolvedValueOnce({
+      ok: true,
+      content: {
+        hooked: true,
+        hookedAt: 1_700_000_000_000,
+        network: [{
+          at: 1_700_000_000_100,
+          source: 'fetch',
+          method: 'GET',
+          url: 'https://example.test/api',
+          status: 200,
+          ok: true,
+          durationMs: 12,
+        }],
+        console: [{ at: 1_700_000_000_200, level: 'error', text: 'submit failed' }],
+        omittedNetwork: 0,
+        omittedConsole: 0,
+      },
+    })
+
+    await expect(executeBridgeOperation(tabs as never, scriptingApi() as never, {
+      kind: 'inspect-page',
+      reset: false,
+    })).resolves.toMatchObject({
+      kind: 'inspect-page',
+      inspect: {
+        tab: { id: 12 },
+        hooked: true,
+        network: [{ method: 'GET', url: 'https://example.test/api', status: 200 }],
+        console: [{ level: 'error', text: 'submit failed' }],
+      },
+    })
+    expect(tabs.sendMessage).toHaveBeenCalledWith(12, { kind: 'dsh-inspect-page', reset: false })
+  })
+
   it('reads a specified tab without activating it and waits for page changes', async () => {
     const tabs = tabsApi()
     tabs.get.mockResolvedValue({
@@ -439,6 +485,58 @@ describe('Chromium tabs adapter', () => {
     expect(tabs.sendMessage).toHaveBeenNthCalledWith(2, 44, {
       kind: 'dsh-wait-page',
       operation: { condition: { kind: 'text', text: '已变化', state: 'present' }, timeoutMs: 500, stableMs: 0 },
+    })
+  })
+
+  it('waits on the focused tab when a pageId binding is missing after a Service Worker restart', async () => {
+    const tabs = tabsApi()
+    tabs.get.mockResolvedValue({
+      id: 12,
+      windowId: 3,
+      active: true,
+      url: 'https://example.test/12',
+      title: 'Current',
+    })
+    tabs.sendMessage.mockResolvedValue({ ok: true, content: pageContent({ text: '稳定' }) })
+    rememberFocusedTab(12)
+
+    await expect(executeBridgeOperation(tabs as never, scriptingApi() as never, {
+      kind: 'wait-page',
+      pageId,
+      condition: { kind: 'ready' },
+      timeoutMs: 500,
+      stableMs: 0,
+    })).resolves.toMatchObject({ kind: 'wait-page', page: { text: '稳定' } })
+    expect(tabs.sendMessage).toHaveBeenCalledWith(12, {
+      kind: 'dsh-wait-page',
+      operation: { condition: { kind: 'ready' }, timeoutMs: 500, stableMs: 0 },
+    })
+  })
+
+  it('keeps wait-page stale when a retained pageId conflicts with an explicit tabId', async () => {
+    const tabs = tabsApi()
+    tabs.get.mockImplementation(async (tabId: number) => ({
+      id: tabId,
+      windowId: 3,
+      active: tabId === 12,
+      url: `https://example.test/${String(tabId)}`,
+    }))
+    tabs.sendMessage.mockResolvedValue({ ok: true, content: pageContent({ text: 'Tab 44' }) })
+
+    await executeBridgeOperation(tabs as never, scriptingApi() as never, { kind: 'read-page', tabId: 44 })
+    await expect(answerBridgeRequest(tabs as never, scriptingApi() as never, request({
+      kind: 'wait-page',
+      pageId,
+      tabId: 12,
+      condition: { kind: 'ready' },
+      timeoutMs: 500,
+      stableMs: 0,
+    }))).resolves.toEqual({
+      ok: false,
+      error: {
+        code: 'BROWSER_PAGE_STALE',
+        message: 'browser extension: page snapshot belongs to another tab; read the page again',
+      },
     })
   })
 
@@ -632,9 +730,14 @@ describe('MV3 extension manifest', () => {
     expect(pageContent).toContain('dsh-read-page')
     expect(pageContent).toContain('dsh-act-page')
     expect(pageContent).toContain('dsh-wait-page')
+    expect(pageContent).toContain('dsh-inspect-page')
+    const pageProbe = await readFile(new URL('../extension/page-probe.js', import.meta.url), 'utf8')
+    expect(pageProbe).toContain('dsh-page-probe-request')
     expect(background).toContain(versionNeedle)
     expect(background).toContain('read-page')
+    expect(background).toContain('inspect-page')
     expect(background).toContain('dsh-read-page')
+    expect(background).toContain('dsh-inspect-page')
     expect(background).toContain('dsh-act-page')
     expect(background).toContain('wait-page')
   })
@@ -655,6 +758,12 @@ describe('MV3 extension manifest', () => {
         js: ['content.js'],
         run_at: 'document_start',
         all_frames: true,
+      }, {
+        matches: ['http://*/*', 'https://*/*'],
+        js: ['page-probe.js'],
+        run_at: 'document_start',
+        all_frames: false,
+        world: 'MAIN',
       }, {
         matches: ['http://*/*', 'https://*/*'],
         js: ['page-content.js'],

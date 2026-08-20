@@ -683,6 +683,23 @@ async function* replayEntry(entry: ReplayEntry, signal: AbortSignal | undefined,
   }
 }
 
+/** Empty Phase-1 JSON so a canned memory replay writes nothing and skips Phase 2. */
+const MEMORY_NOOP_JSON = '{"scope":"user","raw_memory":"","rollout_summary":"","rollout_slug":"","noop":true}'
+
+/**
+ * Yield a successful empty-extraction stream without binding a recorded script.
+ * Background memory calls must not steal conversation or subagent fixtures.
+ * @param signal - optional abort from the auxiliary call.
+ * @returns a one-block stop stream.
+ */
+async function* replayMemoryPurpose(signal?: AbortSignal): AsyncIterable<StreamChunk> {
+  if (signal?.aborted) throw new Error('aborted')
+  yield { type: 'block-start', index: 0, blockType: 'text' }
+  yield { type: 'text-delta', index: 0, text: MEMORY_NOOP_JSON }
+  yield { type: 'block-end', index: 0, block: { type: 'text', text: MEMORY_NOOP_JSON } }
+  yield { type: 'finish', reason: { kind: 'stop' } }
+}
+
 /**
  * Install per-session positional replay. A newly seen live session takes the
  * next ordered recorded script, then advances its own cursor synchronously at
@@ -707,6 +724,7 @@ export function installLlmReplay(ctx: Context, config: ReplayConfig): ReplayHand
   let nextScript = 0
   const ANON = '\0anon\0' // the key for a call that carries no sessionId
   const replay = (options: GenerateOptions): AsyncIterable<StreamChunk> => {
+    if (options.purpose === 'memory') return replayMemoryPurpose(options.signal)
     const key = options.sessionId ?? ANON
     let state = bound.get(key)
     let unrecorded = false

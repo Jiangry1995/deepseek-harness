@@ -37,6 +37,7 @@
 | [lsp.md](lsp.md) | LSP 导航 seam：`LspQueryRequest`/`Result`、`LspProvider`/`Service`、四种操作、`LspError` |
 | [skills.md](skills.md) | skill（技能）服务：发现优先级、`SkillSummary`/`SkillDefinition`、会话前缀目录、面向模型的 `skill` 加载 |
 | [compaction.md](compaction.md) | 压缩（compaction）seam：`compaction/*` 会话事件、`CompactionResult`、`CompactionEngine` 接口 |
+| [memory.md](memory.md) | 本机 markdown 记忆存储：用户/项目根、`MemoryStore`、抽取/巩固，以及记忆工具 |
 | [subagent.md](subagent.md) | subagent seam：命名提供方注册表、`SubagentStartRequest`/`Result`/`Run`、启动时与运行时能力拆分 |
 | [web.md](web.md) | Web 访问 seam：`WebSearchRequest`/`Result`、`WebFetchRequest`/`Result`、`WebFetchBody`、提供方可用性、`WebError` |
 | [browser.md](browser.md) | 浏览器标签页路由：带租约的 Web Client 提供方、封闭的标签页操作／结果、隔离世界扩展桥与 `BrowserError` 失败 |

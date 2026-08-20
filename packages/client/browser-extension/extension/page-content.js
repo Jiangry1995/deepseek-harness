@@ -1,19 +1,6 @@
 (function() {
-	const SCROLL_MOVEMENTS = new Set([
-		"line-up",
-		"line-down",
-		"line-left",
-		"line-right",
-		"page-up",
-		"page-down",
-		"page-left",
-		"page-right",
-		"top",
-		"bottom",
-		"left-edge",
-		"right-edge"
-	]);
-	const PRESS_KEYS = new Set([
+	/** Named keys accepted without a shortcut modifier. */
+	const NAMED_PRESS_KEYS = [
 		"Enter",
 		"Escape",
 		"Tab",
@@ -28,10 +15,86 @@
 		"PageDown",
 		"Backspace",
 		"Delete"
+	];
+	/** Letter keys accepted only with Control, Alt, or Meta. */
+	const LETTER_PRESS_KEYS = [
+		"a",
+		"b",
+		"c",
+		"d",
+		"e",
+		"f",
+		"g",
+		"h",
+		"i",
+		"j",
+		"k",
+		"l",
+		"m",
+		"n",
+		"o",
+		"p",
+		"q",
+		"r",
+		"s",
+		"t",
+		"u",
+		"v",
+		"w",
+		"x",
+		"y",
+		"z"
+	];
+	/** Digit keys accepted only with Control, Alt, or Meta. */
+	const DIGIT_PRESS_KEYS = [
+		"0",
+		"1",
+		"2",
+		"3",
+		"4",
+		"5",
+		"6",
+		"7",
+		"8",
+		"9"
+	];
+	/** Complete bounded keyboard allowlist. */
+	const PRESS_KEY_VALUES = [
+		...NAMED_PRESS_KEYS,
+		...LETTER_PRESS_KEYS,
+		...DIGIT_PRESS_KEYS
+	];
+	const SCROLL_MOVEMENTS = new Set([
+		"line-up",
+		"line-down",
+		"line-left",
+		"line-right",
+		"page-up",
+		"page-down",
+		"page-left",
+		"page-right",
+		"top",
+		"bottom",
+		"left-edge",
+		"right-edge"
 	]);
+	const PRESS_KEYS = new Set(PRESS_KEY_VALUES);
+	const NAMED_PRESS_KEY_SET = new Set(NAMED_PRESS_KEYS);
 	/** Return whether an untrusted bridge value is a plain record. */
 	function isRecord(value) {
 		return typeof value === "object" && value !== null && !Array.isArray(value);
+	}
+	/** Return whether one press operation carries a page-shortcut modifier. */
+	function hasShortcutModifier(modifiers) {
+		return modifiers.ctrl === true || modifiers.alt === true || modifiers.meta === true;
+	}
+	/**
+	* Return whether one key is allowed for the current modifier set.
+	* Named keys work alone. Letter and digit keys are page shortcuts and require Control, Alt, or Meta.
+	*/
+	function isAllowedPressKey(key, modifiers) {
+		if (typeof key !== "string" || !PRESS_KEYS.has(key)) return false;
+		return NAMED_PRESS_KEY_SET.has(key) || hasShortcutModifier(modifiers);
 	}
 	/** Return whether an untrusted value can identify a Chromium tab. */
 	function isSafeTabId(value) {
@@ -61,9 +124,13 @@
 	function isBridgePageField(value) {
 		return isRecord(value) && isPageRef(value.ref) && typeof value.label === "string" && value.label.length <= 160 && typeof value.type === "string" && value.type.length <= 64 && typeof value.value === "string" && value.value.length <= 3e4 && (value.checked === void 0 || typeof value.checked === "boolean") && typeof value.disabled === "boolean" && typeof value.readOnly === "boolean" && typeof value.required === "boolean" && typeof value.inViewport === "boolean" && typeof value.focused === "boolean" && (value.context === void 0 || typeof value.context === "string" && value.context.length <= 200) && (value.options === void 0 || Array.isArray(value.options) && value.options.length <= 40 && value.options.every(isBridgePageOption));
 	}
+	/** Validate one optional element placement. */
+	function isBridgePageRect(value) {
+		return isRecord(value) && Number.isFinite(value.x) && Number.isFinite(value.y) && isNonNegativeNumber(value.width) && isNonNegativeNumber(value.height);
+	}
 	/** Validate one bounded clickable element summary. */
 	function isBridgePageAction(value) {
-		return isRecord(value) && isPageRef(value.ref) && typeof value.role === "string" && value.role.length > 0 && value.role.length <= 32 && typeof value.label === "string" && value.label.length <= 160 && typeof value.disabled === "boolean" && typeof value.inViewport === "boolean" && typeof value.focused === "boolean" && (value.context === void 0 || typeof value.context === "string" && value.context.length <= 200) && (value.href === void 0 || typeof value.href === "string" && value.href.length <= 2e3) && (value.checked === void 0 || typeof value.checked === "boolean") && (value.selected === void 0 || typeof value.selected === "boolean") && (value.expanded === void 0 || typeof value.expanded === "boolean") && (value.pressed === void 0 || typeof value.pressed === "boolean");
+		return isRecord(value) && isPageRef(value.ref) && typeof value.role === "string" && value.role.length > 0 && value.role.length <= 32 && typeof value.label === "string" && value.label.length <= 160 && (value.rect === void 0 || isBridgePageRect(value.rect)) && (value.accent === void 0 || typeof value.accent === "boolean") && typeof value.disabled === "boolean" && typeof value.inViewport === "boolean" && typeof value.focused === "boolean" && (value.context === void 0 || typeof value.context === "string" && value.context.length <= 200) && (value.href === void 0 || typeof value.href === "string" && value.href.length <= 2e3) && (value.checked === void 0 || typeof value.checked === "boolean") && (value.selected === void 0 || typeof value.selected === "boolean") && (value.expanded === void 0 || typeof value.expanded === "boolean") && (value.pressed === void 0 || typeof value.pressed === "boolean");
 	}
 	/** Validate one actually scrollable container summary. */
 	function isBridgePageScrollTarget(value) {
@@ -76,6 +143,22 @@
 	*/
 	function isBridgePageContent(value) {
 		return isRecord(value) && isPageId(value.pageId) && isPageId(value.documentId) && typeof value.revision === "number" && Number.isSafeInteger(value.revision) && value.revision >= 0 && isBridgePageViewport(value.viewport) && typeof value.text === "string" && value.text.length <= 3e4 && Array.isArray(value.fields) && value.fields.length <= 80 && value.fields.every(isBridgePageField) && Array.isArray(value.actions) && value.actions.length <= 120 && value.actions.every(isBridgePageAction) && Array.isArray(value.scrollTargets) && value.scrollTargets.length <= 40 && value.scrollTargets.every(isBridgePageScrollTarget) && typeof value.truncated === "boolean";
+	}
+	/** Validate one bounded network observation. */
+	function isBridgeNetworkEntry(value) {
+		return isRecord(value) && typeof value.at === "number" && Number.isSafeInteger(value.at) && value.at >= 0 && (value.source === "fetch" || value.source === "xhr") && typeof value.method === "string" && value.method.length > 0 && value.method.length <= 16 && typeof value.url === "string" && value.url.length <= 500 && (value.status === void 0 || typeof value.status === "number" && Number.isSafeInteger(value.status) && value.status >= 0 && value.status <= 999) && (value.ok === void 0 || typeof value.ok === "boolean") && (value.durationMs === void 0 || typeof value.durationMs === "number" && Number.isSafeInteger(value.durationMs) && value.durationMs >= 0) && (value.error === void 0 || typeof value.error === "string" && value.error.length <= 500);
+	}
+	/** Validate one bounded console observation. */
+	function isBridgeConsoleEntry(value) {
+		return isRecord(value) && typeof value.at === "number" && Number.isSafeInteger(value.at) && value.at >= 0 && (value.level === "log" || value.level === "info" || value.level === "warn" || value.level === "error" || value.level === "debug") && typeof value.text === "string" && value.text.length <= 500;
+	}
+	/**
+	* Validate inspect content returned directly by the active-page script.
+	* @param value - untrusted content-script result.
+	* @returns whether the value is one bounded inspect snapshot.
+	*/
+	function isBridgePageInspectContent(value) {
+		return isRecord(value) && typeof value.hooked === "boolean" && (value.hookedAt === void 0 || typeof value.hookedAt === "number" && Number.isSafeInteger(value.hookedAt) && value.hookedAt >= 0) && Array.isArray(value.network) && value.network.length <= 40 && value.network.every(isBridgeNetworkEntry) && Array.isArray(value.console) && value.console.length <= 40 && value.console.every(isBridgeConsoleEntry) && typeof value.omittedNetwork === "number" && Number.isSafeInteger(value.omittedNetwork) && value.omittedNetwork >= 0 && typeof value.omittedConsole === "number" && Number.isSafeInteger(value.omittedConsole) && value.omittedConsole >= 0;
 	}
 	/** Validate one wait condition received across the bridge. */
 	function isBridgeWaitCondition(value) {
@@ -104,12 +187,17 @@
 			case "open-tab": return typeof value.url === "string" && typeof value.active === "boolean";
 			case "list-tabs": return true;
 			case "read-page": return value.tabId === void 0 || isSafeTabId(value.tabId);
+			case "inspect-page": return (value.tabId === void 0 || isSafeTabId(value.tabId)) && typeof value.reset === "boolean";
 			case "click-page-element":
 			case "focus-page-element": return isPageId(value.pageId) && isPageRef(value.ref);
 			case "fill-page-element": return isPageId(value.pageId) && isPageRef(value.ref) && typeof value.value === "string" && value.value.length <= 1e4 && typeof value.submit === "boolean";
 			case "select-page-option": return isPageId(value.pageId) && isPageRef(value.ref) && typeof value.value === "string" && value.value.length <= 1e3;
 			case "scroll-page": return isPageId(value.pageId) && (value.ref === void 0 || isPageRef(value.ref)) && typeof value.movement === "string" && SCROLL_MOVEMENTS.has(value.movement);
-			case "press-page-key": return isPageId(value.pageId) && isPageRef(value.ref) && typeof value.key === "string" && PRESS_KEYS.has(value.key) && isRecord(value.modifiers) && (value.modifiers.ctrl === void 0 || typeof value.modifiers.ctrl === "boolean") && (value.modifiers.alt === void 0 || typeof value.modifiers.alt === "boolean") && (value.modifiers.shift === void 0 || typeof value.modifiers.shift === "boolean") && (value.modifiers.meta === void 0 || typeof value.modifiers.meta === "boolean") && typeof value.repeat === "number" && Number.isSafeInteger(value.repeat) && value.repeat >= 1 && value.repeat <= 20;
+			case "press-page-key": return isPageId(value.pageId) && isPageRef(value.ref) && isRecord(value.modifiers) && (value.modifiers.ctrl === void 0 || typeof value.modifiers.ctrl === "boolean") && (value.modifiers.alt === void 0 || typeof value.modifiers.alt === "boolean") && (value.modifiers.shift === void 0 || typeof value.modifiers.shift === "boolean") && (value.modifiers.meta === void 0 || typeof value.modifiers.meta === "boolean") && isAllowedPressKey(value.key, {
+				ctrl: value.modifiers.ctrl === true,
+				alt: value.modifiers.alt === true,
+				meta: value.modifiers.meta === true
+			}) && typeof value.repeat === "number" && Number.isSafeInteger(value.repeat) && value.repeat >= 1 && value.repeat <= 20;
 			case "wait-page": return (isPageId(value.pageId) || isSafeTabId(value.tabId)) && (value.pageId === void 0 || isPageId(value.pageId)) && (value.tabId === void 0 || isSafeTabId(value.tabId)) && isBridgeWaitCondition(value.condition) && typeof value.timeoutMs === "number" && Number.isSafeInteger(value.timeoutMs) && value.timeoutMs >= 100 && value.timeoutMs <= 3e4 && typeof value.stableMs === "number" && Number.isSafeInteger(value.stableMs) && value.stableMs >= 0 && value.stableMs <= 2e3;
 			case "activate-tab":
 			case "close-tab": return isSafeTabId(value.tabId);
@@ -184,6 +272,11 @@
 	const MAX_ACTION_COUNT = 120;
 	const MAX_LABEL_LENGTH = 160;
 	const MAX_SHORT_FIELD_VALUE_LENGTH = 500;
+	const UNLABELED = "(unlabeled)";
+	const POINTER_CURSOR = "pointer";
+	const INFERRED_CLICK_ROLE = "clickable";
+	/** Compact icon controls need a rect so same-looking siblings can be told apart by placement. */
+	const COMPACT_ACTION_PX = 56;
 	/** Normalize rendered text while retaining meaningful line breaks. */
 	function normalizeText(value) {
 		return value.replace(/\r\n?/g, "\n").replace(/[\t\f\v\u00a0 ]+/g, " ").replace(/ *\n */g, "\n").replace(/\n{3,}/g, "\n\n").trim();
@@ -231,6 +324,16 @@
 		const declared = element.getAttribute("contenteditable")?.trim().toLowerCase();
 		return declared === "" || declared === "true" || declared === "plaintext-only";
 	}
+	/** Return the rounded viewport placement used to tell same-looking controls apart. */
+	function elementRect(element) {
+		const rect = element.getBoundingClientRect();
+		return {
+			x: Math.round(rect.left),
+			y: Math.round(rect.top),
+			width: Math.round(rect.width),
+			height: Math.round(rect.height)
+		};
+	}
 	/** Resolve the closest user-facing label for an element. */
 	function elementLabel(element) {
 		const labeledControl = element;
@@ -242,7 +345,7 @@
 			element.innerText || element.textContent,
 			element.getAttribute("name"),
 			element.id
-		].map((candidate) => normalizeText(candidate ?? "")).find((candidate) => candidate !== "") ?? "(unlabeled)";
+		].map((candidate) => normalizeText(candidate ?? "")).find((candidate) => candidate !== "") ?? UNLABELED;
 		return (associated || fallback).slice(0, MAX_LABEL_LENGTH);
 	}
 	/** Return a short heading or accessible name for a semantic container. */
@@ -363,16 +466,50 @@
 		if (value === "true") return true;
 		if (value === "false") return false;
 	}
+	/** Parse one computed CSS rgb/rgba color into 0-255 channels. */
+	function parseCssColor(value) {
+		const match = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*(\d*\.?\d+))?\s*\)/.exec(value);
+		if (match === null) return void 0;
+		return {
+			r: Number(match[1]),
+			g: Number(match[2]),
+			b: Number(match[3]),
+			a: match[4] === void 0 ? 1 : Number(match[4])
+		};
+	}
+	/** Return whether one color is a saturated fill rather than gray, white, or transparent. */
+	function isAccentColor(value) {
+		const color = parseCssColor(value);
+		if (color === void 0 || color.a < .4) return false;
+		const max = Math.max(color.r, color.g, color.b);
+		const min = Math.min(color.r, color.g, color.b);
+		if (max < 80) return false;
+		return (max - min) / max >= .25;
+	}
+	/** Return whether one control uses a saturated non-gray fill on itself or its nearest painted ancestor. */
+	function isAccentSurface(element) {
+		let current = element;
+		for (let depth = 0; depth < 4 && current !== null; depth += 1) {
+			if (isAccentColor(window.getComputedStyle(current).backgroundColor)) return true;
+			current = current.parentElement;
+		}
+		return false;
+	}
 	/** Convert one supported action element to its bounded current state. */
-	function pageAction(element, state) {
+	function pageAction(element, state, role) {
+		const label = elementLabel(element);
 		const action = {
 			ref: assignPageRef(element, state),
-			role: actionRole(element).slice(0, 32),
-			label: elementLabel(element),
+			role: (role ?? actionRole(element)).slice(0, 32),
+			label,
 			disabled: actionDisabled(element),
 			inViewport: isInViewport(element),
 			focused: element.ownerDocument.activeElement === element
 		};
+		const rect = elementRect(element);
+		const compact = rect.width > 0 && rect.height > 0 && rect.width <= COMPACT_ACTION_PX && rect.height <= COMPACT_ACTION_PX;
+		if (label === UNLABELED || compact) action.rect = rect;
+		if (isAccentSurface(element)) action.accent = true;
 		const context = elementContext(element);
 		if (context !== void 0) action.context = context;
 		if (element instanceof HTMLAnchorElement) {
@@ -389,6 +526,41 @@
 		const pressed = ariaBoolean(element, "aria-pressed");
 		if (pressed !== void 0) action.pressed = pressed;
 		return action;
+	}
+	/**
+	* Return whether one pointer-cursor element is worth exposing on its own.
+	* An element already referenced by this snapshot, or one wrapping a reference,
+	* is skipped because that inner reference is the more precise click target.
+	*/
+	function isInferredClickTarget(element) {
+		if (element.hasAttribute("data-dsh-page-ref")) return false;
+		if (element.querySelector(`[data-dsh-page-ref]`) !== null) return false;
+		if (element.getAttribute("aria-hidden") === "true") return false;
+		const rect = element.getBoundingClientRect();
+		return rect.width > 0 && rect.height > 0 && isInViewport(element);
+	}
+	/**
+	* Record the outermost pointer-cursor element of each on-screen region.
+	* Frameworks build icon controls from click handlers on plain containers, which
+	* carry no role and no accessible name; without this pass the model has no
+	* reference for a control the user can see, such as a chat composer send icon.
+	* `cursor` inherits, so recording a region ends the descent into it.
+	* @param element - current element of the depth-first walk.
+	* @param parentCursor - computed cursor of the parent element.
+	* @param actions - actions collected so far, extended in place.
+	*/
+	function collectInferredClickTargets(element, parentCursor, actions, state, onTruncated) {
+		if (actions.length >= MAX_ACTION_COUNT) {
+			onTruncated();
+			return;
+		}
+		const style = window.getComputedStyle(element);
+		if (style.display === "none" || style.visibility === "hidden") return;
+		if (style.cursor === POINTER_CURSOR && parentCursor !== POINTER_CURSOR && isInferredClickTarget(element)) {
+			actions.push(pageAction(element, state, INFERRED_CLICK_ROLE));
+			return;
+		}
+		for (const child of element.children) if (child instanceof HTMLElement) collectInferredClickTargets(child, style.cursor, actions, state, onTruncated);
 	}
 	/** Collect the main document and accessible same-origin child-frame documents. */
 	function pageDocuments$1() {
@@ -532,6 +704,7 @@
 			}
 			if (actions.length >= MAX_ACTION_COUNT) break;
 		}
+		for (const current of documents) collectInferredClickTargets(current.body, "", actions, referenceState, markTruncated);
 		const scrollTargets = collectScrollTargets(documents, referenceState, markTruncated);
 		return {
 			pageId,
@@ -560,6 +733,20 @@
 		}
 	};
 	const LINE_SCROLL_PX = 40;
+	const SKIP_KEYPRESS = new Set([
+		"Tab",
+		"Escape",
+		"ArrowUp",
+		"ArrowDown",
+		"ArrowLeft",
+		"ArrowRight",
+		"Home",
+		"End",
+		"PageUp",
+		"PageDown",
+		"Backspace",
+		"Delete"
+	]);
 	/** Collect the main document and accessible same-origin child-frame documents. */
 	function pageDocuments() {
 		const documents = [document];
@@ -647,14 +834,75 @@
 			composed: true
 		}));
 	}
-	/** Submit the owning form or dispatch an Enter sequence for standalone search controls. */
+	/** Submit the owning form, click a nearby send control, or dispatch Enter for standalone search. */
 	function submitElement(element) {
 		const form = element.closest("form");
 		if (form instanceof HTMLFormElement) {
 			form.requestSubmit();
 			return;
 		}
+		const send = findComposerSubmitButton(element);
+		if (send !== void 0) {
+			clickElement(send);
+			return;
+		}
+		if (element instanceof HTMLButtonElement || element.getAttribute("role") === "button") {
+			element.click();
+			return;
+		}
 		dispatchKeySequence(element, "Enter", {});
+	}
+	const COMPOSER_SCOPE_SELECTOR = "form, [role=\"form\"], .el-editor-sender, .ch-chat-input, [class*=\"editor-sender\"]";
+	const SEND_CONTROL_NAME = /发送|send|submit|提交/i;
+	const REJECT_CONTROL_NAME = /删除|delete|清空|clear|关闭|close|取消|cancel|新开对话|new chat|new conversation/i;
+	const COMPOSER_CONTROL_SELECTOR = "button, [role=\"button\"], input[type=\"submit\"]";
+	const COMPOSER_ANCESTOR_WALK = 8;
+	/** Collect accessible names used to recognize send versus destructive composer controls. */
+	function controlName(element) {
+		return [
+			element.getAttribute("aria-label"),
+			element.getAttribute("title"),
+			element.innerText || element.textContent
+		].filter((candidate) => candidate !== null && candidate !== "").join(" ");
+	}
+	/** Return whether one control is a native form submit button. */
+	function isNativeSubmitControl(element) {
+		return (element instanceof HTMLInputElement || element instanceof HTMLButtonElement) && element.type === "submit";
+	}
+	/**
+	* Find an enabled send or submit control inside one composer subtree.
+	* Named send/submit wins; otherwise a native submit; otherwise the unique remaining non-destructive button.
+	* Destructive names such as delete are never chosen, including the first button in a send-button cluster.
+	*/
+	function submitButtonIn(scope, from) {
+		const controls = [...scope.querySelectorAll(COMPOSER_CONTROL_SELECTOR)].filter((element) => element !== from && !isDisabled(element));
+		const namedSend = controls.find((element) => {
+			const name = controlName(element);
+			return SEND_CONTROL_NAME.test(name) && !REJECT_CONTROL_NAME.test(name);
+		});
+		if (namedSend !== void 0) return namedSend;
+		const nativeSubmit = controls.find((element) => isNativeSubmitControl(element) && !REJECT_CONTROL_NAME.test(controlName(element)));
+		if (nativeSubmit !== void 0) return nativeSubmit;
+		const remaining = controls.filter((element) => !REJECT_CONTROL_NAME.test(controlName(element)));
+		return remaining.length === 1 ? remaining[0] : void 0;
+	}
+	/** Locate a nearby composer send control when the filled field is not inside a native form. */
+	function findComposerSubmitButton(from) {
+		const closest = from.closest(COMPOSER_SCOPE_SELECTOR);
+		if (closest !== null) return submitButtonIn(closest, from);
+		let scope = from.parentElement;
+		for (let depth = 0; depth < COMPOSER_ANCESTOR_WALK && scope !== null; depth += 1) {
+			const found = submitButtonIn(scope, from);
+			if (found !== void 0) return found;
+			scope = scope.parentElement;
+		}
+	}
+	/** Click a nearby send control when Enter was prevented on a non-form composer field. */
+	function submitStandaloneComposer(element) {
+		if (element.closest("form") instanceof HTMLFormElement) return;
+		const send = findComposerSubmitButton(element);
+		if (send === void 0 || send === element) return;
+		clickElement(send);
 	}
 	/** Return the current user-visible text stored by one filled control. */
 	function currentEditableValue(element) {
@@ -689,6 +937,10 @@
 			const actual = normalizeComparable(currentEditableValue(element));
 			const expected = normalizeComparable(value);
 			if (expected !== "" && actual !== expected && !actual.includes(expected)) throw new PageActionError("BROWSER_ELEMENT_NOT_EDITABLE", "the contenteditable value did not match the requested text");
+			element.dispatchEvent(new Event("change", {
+				bubbles: true,
+				composed: true
+			}));
 			if (submit) submitElement(element);
 			return;
 		} else throw new PageActionError("BROWSER_ELEMENT_NOT_EDITABLE", "the referenced element is not a text field");
@@ -696,11 +948,65 @@
 		if (normalizeComparable(currentEditableValue(element)) !== normalizeComparable(value)) throw new PageActionError("BROWSER_ELEMENT_NOT_EDITABLE", "the control value did not match the requested text after filling");
 		if (submit) submitElement(element);
 	}
-	/** Click one enabled referenced element. */
-	function clickElement(element) {
-		if (isDisabled(element)) throw new PageActionError("BROWSER_ELEMENT_DISABLED", "the referenced element is disabled");
-		element.focus();
+	/** Return whether one element is a native or ARIA control that should receive the click. */
+	function isActivationControl(element) {
+		if (isDisabled(element)) return false;
+		if (element instanceof HTMLButtonElement) return true;
+		if (element instanceof HTMLAnchorElement && element.getAttribute("href") !== null) return true;
+		if (element instanceof HTMLInputElement) return [
+			"button",
+			"submit",
+			"reset",
+			"image",
+			"checkbox",
+			"radio"
+		].includes(element.type);
+		const role = element.getAttribute("role");
+		return role === "button" || role === "link" || role === "tab" || role === "menuitem" || role === "option" || role === "checkbox" || role === "radio";
+	}
+	/**
+	* Resolve the control a click should activate.
+	* Icon markup and composer chrome are often the referenced node; the named send or nearest button is the effect.
+	*/
+	function activationTarget(element) {
+		if (isActivationControl(element)) return element;
+		const closest = element.closest("button, a[href], input[type=\"button\"], input[type=\"submit\"], [role=\"button\"]");
+		if (closest instanceof HTMLElement && isActivationControl(closest)) return closest;
+		const send = findComposerSubmitButton(element);
+		if (send !== void 0) return send;
+		const nested = [...element.querySelectorAll(COMPOSER_CONTROL_SELECTOR)].filter((candidate) => isActivationControl(candidate) && !REJECT_CONTROL_NAME.test(controlName(candidate)));
+		return nested.length === 1 ? nested[0] : element;
+	}
+	/** Dispatch a pointer sequence then a native click so framework click and pointer handlers both run. */
+	function dispatchActivation(element) {
+		const mouseInit = {
+			bubbles: true,
+			cancelable: true,
+			composed: true,
+			button: 0
+		};
+		if (typeof PointerEvent === "function") {
+			const pointerInit = {
+				...mouseInit,
+				pointerId: 1,
+				pointerType: "mouse"
+			};
+			element.dispatchEvent(new PointerEvent("pointerdown", pointerInit));
+			element.dispatchEvent(new MouseEvent("mousedown", mouseInit));
+			element.dispatchEvent(new PointerEvent("pointerup", pointerInit));
+			element.dispatchEvent(new MouseEvent("mouseup", mouseInit));
+		} else {
+			element.dispatchEvent(new MouseEvent("mousedown", mouseInit));
+			element.dispatchEvent(new MouseEvent("mouseup", mouseInit));
+		}
 		element.click();
+	}
+	/** Click the activation target of one referenced element. */
+	function clickElement(element) {
+		const target = activationTarget(element);
+		if (isDisabled(target)) throw new PageActionError("BROWSER_ELEMENT_DISABLED", "the referenced element is disabled");
+		target.focus();
+		dispatchActivation(target);
 	}
 	/** Select one native option by exact value or normalized visible text. */
 	function selectOption(element, requestedValue) {
@@ -808,33 +1114,63 @@
 		element.focus();
 		if (!isActiveElement(element)) throw new PageActionError("BROWSER_CAPABILITY_UNAVAILABLE", "document.activeElement is not the referenced element after focus");
 	}
+	/** Map a bounded key onto KeyboardEvent.code. */
+	function keyCode(key) {
+		if (key === "Space") return "Space";
+		if (key.length === 1 && key >= "a" && key <= "z") return `Key${key.toUpperCase()}`;
+		if (key.length === 1 && key >= "0" && key <= "9") return `Digit${key}`;
+		return key;
+	}
+	/** Map a bounded key onto KeyboardEvent.key, applying Shift for letters. */
+	function eventKeyFor(key, shift) {
+		if (key === "Space") return " ";
+		if (key.length === 1 && key >= "a" && key <= "z") return shift ? key.toUpperCase() : key;
+		return key;
+	}
+	const NAMED_LEGACY_KEY_CODES = {
+		Enter: 13,
+		Escape: 27,
+		Tab: 9,
+		Space: 32,
+		ArrowUp: 38,
+		ArrowDown: 40,
+		ArrowLeft: 37,
+		ArrowRight: 39,
+		Home: 36,
+		End: 35,
+		PageUp: 33,
+		PageDown: 34,
+		Backspace: 8,
+		Delete: 46
+	};
+	/**
+	* Map a bounded key onto the legacy `keyCode`/`which` value. Pages that gate a
+	* gesture on `event.keyCode` — chat composers sending on `keyCode === 13` are
+	* the common case — never react to a synthetic event that omits it, because
+	* the constructor defaults these members to 0.
+	*/
+	function legacyKeyCode(key) {
+		const named = NAMED_LEGACY_KEY_CODES[key];
+		if (named !== void 0) return named;
+		return key.toUpperCase().charCodeAt(0);
+	}
 	/** Dispatch a bubbling, cancelable key sequence against one element. */
 	function dispatchKeySequence(element, key, modifiers) {
-		const code = key === "Space" ? "Space" : key;
-		const eventKey = key === "Space" ? " " : key;
+		const code = keyCode(key);
+		const eventKey = eventKeyFor(key, modifiers.shift === true);
+		const legacy = legacyKeyCode(key);
 		let prevented = false;
 		for (const type of [
 			"keydown",
 			"keypress",
 			"keyup"
 		]) {
-			if (type === "keypress" && [
-				"Tab",
-				"Escape",
-				"ArrowUp",
-				"ArrowDown",
-				"ArrowLeft",
-				"ArrowRight",
-				"Home",
-				"End",
-				"PageUp",
-				"PageDown",
-				"Backspace",
-				"Delete"
-			].includes(key)) continue;
+			if (type === "keypress" && SKIP_KEYPRESS.has(key)) continue;
 			const event = new KeyboardEvent(type, {
 				key: eventKey,
 				code,
+				keyCode: legacy,
+				which: legacy,
 				bubbles: true,
 				composed: true,
 				cancelable: true,
@@ -898,6 +1234,7 @@
 		for (let index = 0; index < repeat; index += 1) {
 			if (dispatchKeySequence(element, key, modifiers)) {
 				observed = true;
+				if (key === "Enter") submitStandaloneComposer(element);
 				continue;
 			}
 			if (applyKeyDefault(element, key, modifiers)) observed = true;
@@ -1056,6 +1393,65 @@
 	}
 	/** Location listeners exist so History API and hash changes wake the wait loop promptly. */
 	function onLocationSignal() {}
+	//#endregion
+	//#region lib/types/extension/page-probe-protocol.js
+	/** Shared MAIN-world probe event names and snapshot bounds. */
+	/** Isolated-world request asking the MAIN-world probe for its current buffers. */
+	const PAGE_PROBE_REQUEST_EVENT = "dsh-page-probe-request";
+	/** MAIN-world reply carrying a cloned Network/Console snapshot. */
+	const PAGE_PROBE_SNAPSHOT_EVENT = "dsh-page-probe-snapshot";
+	//#endregion
+	//#region lib/types/extension/page-probe-collector.js
+	/** Isolated-world collector that asks the MAIN-world probe for a Network/Console snapshot. */
+	/** Empty inspect payload used when the MAIN-world probe did not answer. */
+	const UNHOOKED = {
+		hooked: false,
+		network: [],
+		console: [],
+		omittedNetwork: 0,
+		omittedConsole: 0
+	};
+	/**
+	* Ask the MAIN-world probe for its current buffers.
+	* @param reset - whether to clear the MAIN-world buffers after this snapshot.
+	* @param target - window used for CustomEvent exchange.
+	* @returns a protocol-valid inspect payload, hooked or not.
+	*/
+	function collectPageProbe(reset = false, target = window) {
+		const requestId = crypto.randomUUID();
+		return new Promise((resolve) => {
+			let settled = false;
+			/** Deliver one snapshot exactly once. */
+			const finish = (content) => {
+				if (settled) return;
+				settled = true;
+				target.removeEventListener(PAGE_PROBE_SNAPSHOT_EVENT, onSnapshot);
+				resolve(content);
+			};
+			/** Accept a MAIN-world snapshot that matches this request. */
+			const onSnapshot = (event) => {
+				const detail = event.detail;
+				if (detail?.requestId !== requestId || detail.hooked !== true) return;
+				finish({
+					hooked: true,
+					hookedAt: detail.hookedAt,
+					network: detail.network,
+					console: detail.console,
+					omittedNetwork: detail.omittedNetwork,
+					omittedConsole: detail.omittedConsole
+				});
+			};
+			target.addEventListener(PAGE_PROBE_SNAPSHOT_EVENT, onSnapshot);
+			const request = {
+				requestId,
+				reset
+			};
+			target.dispatchEvent(new CustomEvent(PAGE_PROBE_REQUEST_EVENT, { detail: request }));
+			setTimeout(() => {
+				finish(UNHOOKED);
+			}, 400);
+		});
+	}
 	const PAGE_ACTION_KINDS = new Set([
 		"click-page-element",
 		"fill-page-element",
@@ -1089,6 +1485,14 @@
 	function isWaitPageDomRequest(message) {
 		return typeof message === "object" && message !== null && "kind" in message && message.kind === "dsh-wait-page" && "operation" in message && isBridgeWaitPageDomOperation(message.operation);
 	}
+	/**
+	* Return whether one runtime message is a page-inspect request.
+	* @param message - untrusted content-script runtime message.
+	* @returns whether the dedicated inspect discriminator is present.
+	*/
+	function isInspectPageDomRequest(message) {
+		return typeof message === "object" && message !== null && "kind" in message && message.kind === "dsh-inspect-page" && "reset" in message && typeof message.reset === "boolean";
+	}
 	/** Map a thrown page-script error onto a stable bridge failure. */
 	function failurePayload(error) {
 		if (error instanceof PageWaitError) return {
@@ -1107,17 +1511,18 @@
 		};
 	}
 	/**
-	* Answer page-read, action, and wait requests from the already-injected content script.
+	* Answer page-read, action, wait, and inspect requests from the already-injected content script.
 	* @param runtime - content-script runtime messaging API.
 	* @param readPage - DOM extractor bound to this document.
 	* @param actPage - document-bound page action executor.
 	* @param waitPage - in-tab wait executor.
+	* @param inspectPage - MAIN-world Network/Console collector.
 	* @returns listener disposer.
 	*/
-	function installPageReader(runtime, readPage, actPage, waitPage) {
-		/** Reply to one in-tab read, action, or wait request. */
+	function installPageReader(runtime, readPage, actPage, waitPage, inspectPage) {
+		/** Reply to one in-tab read, action, wait, or inspect request. */
 		const listener = (message, _sender, sendResponse) => {
-			if (!isReadPageDomRequest(message) && !isActPageDomRequest(message) && !isWaitPageDomRequest(message)) return;
+			if (!isReadPageDomRequest(message) && !isActPageDomRequest(message) && !isWaitPageDomRequest(message) && !isInspectPageDomRequest(message)) return;
 			if (isWaitPageDomRequest(message)) {
 				if (waitPage === void 0) {
 					sendResponse(failurePayload(/* @__PURE__ */ new Error("browser extension: page waiter is unavailable")));
@@ -1126,6 +1531,25 @@
 				waitPage(message.operation).then((content) => {
 					if (!isBridgePageContent(content)) {
 						sendResponse(failurePayload(/* @__PURE__ */ new Error("browser extension: page script returned an invalid result")));
+						return;
+					}
+					sendResponse({
+						ok: true,
+						content
+					});
+				}, (error) => {
+					sendResponse(failurePayload(error));
+				});
+				return true;
+			}
+			if (isInspectPageDomRequest(message)) {
+				if (inspectPage === void 0) {
+					sendResponse(failurePayload(/* @__PURE__ */ new Error("browser extension: page inspector is unavailable")));
+					return false;
+				}
+				inspectPage(message.reset).then((content) => {
+					if (!isBridgePageInspectContent(content)) {
+						sendResponse(failurePayload(/* @__PURE__ */ new Error("browser extension: page script returned an invalid inspect result")));
 						return;
 					}
 					sendResponse({
@@ -1165,6 +1589,6 @@
 	//#endregion
 	//#region lib/types/extension/page-content.js
 	/** MV3 content-script entry that reads the current HTTP(S) page for the side assistant. */
-	installPageReader(chrome.runtime, readVisiblePage, actOnPage, waitForPage);
+	installPageReader(chrome.runtime, readVisiblePage, actOnPage, waitForPage, collectPageProbe);
 	//#endregion
 })();

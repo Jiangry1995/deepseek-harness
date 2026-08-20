@@ -433,6 +433,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the tab metadata and its main-frame page snapshot.',
       },
       {
+        signature: 'async inspectPage( requestOrSignal: BrowserInspectPageRequest | AbortSignal, signal?: AbortSignal, ): Promise<BrowserPageInspect>',
+        description: 'Read recent page fetch/XHR calls and console messages captured after the in-page probe was installed. Native DevTools cannot be opened; this is the inspect surface available to the assistant.',
+        parameters: [{ name: 'requestOrSignal', description: 'optional tab identity and reset flag, or the caller AbortSignal for the active tab.' }, { name: 'signal', description: 'caller cancellation when the first argument is a request record.' }],
+        returns: 'the tab metadata and bounded Network/Console snapshot.',
+      },
+      {
+        signature: 'resolveInspectPage(request: BrowserInspectPageRequest): BrowserInspectPageSpec',
+        description: 'Validate and default one inspect-page request.',
+        parameters: [{ name: 'request', description: 'optional tab identity and reset flag.' }],
+        returns: 'a complete provider operation.',
+      },
+      {
         signature: 'resolvePageTarget(rawPageId: string, rawRef: string): BrowserPageTarget',
         description: 'Validate and brand a document-bound target returned by the latest page read.',
         parameters: [{ name: 'rawPageId', description: 'page UUID supplied at the model-tool boundary.' }, { name: 'rawRef', description: 'element reference supplied at the model-tool boundary.' }],
@@ -1024,6 +1036,93 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Select a provider by the file\'s extension and run one query. Selection is per-query and order-independent; no match throws `LspError` `LSP_UNAVAILABLE`.',
         parameters: [{ name: 'request', description: 'the normalized query.' }, { name: 'signal', description: 'optional cancellation forwarded to the selected provider.' }],
         returns: 'the normalized, closed-union result.',
+      },
+    ],
+  },
+  {
+    key: 'memory',
+    summary: 'File-backed memory store.',
+    description: 'File-backed memory store. Every relative path is resolved inside the selected root; watermark and lock files stay invisible to tools.',
+    methods: [
+      {
+        signature: 'rootFor(scope: MemoryScope, cwd?: string): string',
+        description: 'Resolve the absolute root for one scope.',
+        parameters: [{ name: 'scope', description: 'user-level or project-level tree.' }, { name: 'cwd', description: 'agent working directory; required for `project`.' }],
+        returns: 'the absolute memory root.',
+      },
+      {
+        signature: 'list(scope: MemoryScope, cwd?: string): Promise<MemoryFileEntry[]>',
+        description: 'List visible files in one memory tree.',
+        parameters: [{ name: 'scope', description: 'user-level or project-level tree.' }, { name: 'cwd', description: 'agent working directory; required for `project`.' }],
+        returns: 'sorted file entries; a missing tree is empty.',
+      },
+      {
+        signature: 'search(scope: MemoryScope, query: string, cwd?: string): Promise<MemorySearchHit[]>',
+        description: 'Grep visible files in one memory tree.',
+        parameters: [{ name: 'scope', description: 'user-level or project-level tree.' }, { name: 'query', description: 'case-insensitive substring.' }, { name: 'cwd', description: 'agent working directory; required for `project`.' }],
+        returns: 'matching lines up to the hit cap.',
+      },
+      {
+        signature: 'read(scope: MemoryScope, relativePath: string, cwd?: string): Promise<string>',
+        description: 'Read one visible file.',
+        parameters: [{ name: 'scope', description: 'user-level or project-level tree.' }, { name: 'relativePath', description: 'root-relative path.' }, { name: 'cwd', description: 'agent working directory; required for `project`.' }],
+        returns: 'file text, truncated when larger than the read cap.',
+      },
+      {
+        signature: 'async writeNote(scope: MemoryScope, input: MemoryNoteWrite, cwd?: string): Promise<string>',
+        description: 'Write an inbox note. The model uses this only when the user explicitly asked to remember, forget, or change a memory.',
+        parameters: [{ name: 'scope', description: 'user-level or project-level tree.' }, { name: 'input', description: 'note body and optional slug.' }, { name: 'cwd', description: 'agent working directory; required for `project`.' }],
+        returns: 'the created root-relative POSIX path.',
+      },
+      {
+        signature: 'async listPendingNotes(scope: MemoryScope, cwd?: string): Promise<string[]>',
+        description: 'List inbox notes that have not been moved to `notes/processed`.',
+        parameters: [{ name: 'scope', description: 'user-level or project-level tree.' }, { name: 'cwd', description: 'agent working directory; required for `project`.' }],
+        returns: 'pending note paths.',
+      },
+      {
+        signature: 'async markNotesProcessed(scope: MemoryScope, relativePaths: readonly string[], cwd?: string): Promise<void>',
+        description: 'Move inbox notes into `notes/processed` after a successful consolidate.',
+        parameters: [{ name: 'scope', description: 'user-level or project-level tree.' }, { name: 'relativePaths', description: 'pending note paths to archive.' }, { name: 'cwd', description: 'agent working directory; required for `project`.' }],
+      },
+      {
+        signature: 'async appendRawMemory(scope: MemoryScope, text: string, cwd?: string): Promise<void>',
+        description: 'Append one Phase-1 raw extraction block.',
+        parameters: [{ name: 'scope', description: 'user-level or project-level tree.' }, { name: 'text', description: 'extraction text.' }, { name: 'cwd', description: 'agent working directory; required for `project`.' }],
+      },
+      {
+        signature: 'async writeSessionSummary(scope: MemoryScope, slug: string, text: string, cwd?: string): Promise<string>',
+        description: 'Write one session-summary file under `session_summaries/`.',
+        parameters: [{ name: 'scope', description: 'user-level or project-level tree.' }, { name: 'slug', description: 'filename slug without extension.' }, { name: 'text', description: 'summary body.' }, { name: 'cwd', description: 'agent working directory; required for `project`.' }],
+        returns: 'the created root-relative POSIX path.',
+      },
+      {
+        signature: 'async writeHandbook(scope: MemoryScope, handbook: MemoryHandbook, cwd?: string): Promise<void>',
+        description: 'Replace the handbook, summary, and any returned skill files.',
+        parameters: [{ name: 'scope', description: 'user-level or project-level tree.' }, { name: 'handbook', description: 'consolidator output.' }, { name: 'cwd', description: 'agent working directory; required for `project`.' }],
+      },
+      {
+        signature: 'async readSummary(scope: MemoryScope, cwd?: string): Promise<string>',
+        description: 'Read `memory_summary.md` for prompt injection. A missing file is empty.',
+        parameters: [{ name: 'scope', description: 'user-level or project-level tree.' }, { name: 'cwd', description: 'agent working directory; required for `project`.' }],
+        returns: 'summary text, or an empty string.',
+      },
+      {
+        signature: 'promptSummary(scope: MemoryScope, cwd?: string): string',
+        description: 'Synchronously read `memory_summary.md` for prompt assembly.',
+        parameters: [{ name: 'scope', description: 'user-level or project-level tree.' }, { name: 'cwd', description: 'agent working directory; required for `project`.' }],
+        returns: 'summary text, or an empty string when the file is missing.',
+      },
+      {
+        signature: 'async lastTurn(sessionId: string): Promise<number>',
+        description: 'Highest turn already considered for one session, from the user-root watermark.',
+        parameters: [{ name: 'sessionId', description: 'session identity.' }],
+        returns: 'last considered turn, or `0` when none.',
+      },
+      {
+        signature: 'setLastTurn(sessionId: string, turn: number): Promise<void>',
+        description: 'Advance the user-root watermark after a turn has been considered.',
+        parameters: [{ name: 'sessionId', description: 'session identity.' }, { name: 'turn', description: 'highest considered turn number.' }],
       },
     ],
   },
@@ -2926,6 +3025,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type BrowserCompletionReceipt = {\n    accepted: true;\n} | {\n    accepted: false;\n    reason: \'request-not-found\' | \'wrong-client\' | \'result-kind-mismatch\';\n};',
   },
   {
+    name: 'BrowserConsoleEntry',
+    declaration: 'export interface BrowserConsoleEntry {\n    at: number;\n    level: \'log\' | \'info\' | \'warn\' | \'error\' | \'debug\';\n    text: string;\n}',
+  },
+  {
     name: 'BrowserDisconnectReceipt',
     declaration: 'export interface BrowserDisconnectReceipt {\n    disconnected: boolean;\n}',
   },
@@ -2946,6 +3049,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface BrowserFillPageSpec extends BrowserPageTarget {\n    kind: \'fill-page-element\';\n    value: string;\n    submit: boolean;\n}',
   },
   {
+    name: 'BrowserInspectPageRequest',
+    declaration: 'export interface BrowserInspectPageRequest {\n    tabId?: number;\n    reset?: boolean;\n}',
+  },
+  {
+    name: 'BrowserInspectPageSpec',
+    declaration: 'export interface BrowserInspectPageSpec {\n    kind: \'inspect-page\';\n    tabId?: number;\n    reset: boolean;\n}',
+  },
+  {
+    name: 'BrowserNetworkEntry',
+    declaration: 'export interface BrowserNetworkEntry {\n    at: number;\n    source: \'fetch\' | \'xhr\';\n    method: string;\n    url: string;\n    status?: number;\n    ok?: boolean;\n    durationMs?: number;\n    error?: string;\n}',
+  },
+  {
     name: 'BrowserOpenTabRequest',
     declaration: 'export interface BrowserOpenTabRequest {\n    url: string;\n    active?: boolean;\n}',
   },
@@ -2955,11 +3070,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'BrowserOperation',
-    declaration: 'export type BrowserOperation = BrowserOpenTabSpec | {\n    kind: \'list-tabs\';\n} | ({\n    kind: \'read-page\';\n} & BrowserReadPageRequest) | ({\n    kind: \'click-page-element\';\n} & BrowserPageTarget) | BrowserFillPageSpec | ({\n    kind: \'select-page-option\';\n} & BrowserSelectPageRequest) | BrowserScrollPageSpec | ({\n    kind: \'focus-page-element\';\n} & BrowserPageTarget) | BrowserPressPageSpec | BrowserWaitPageSpec | {\n    kind: \'activate-tab\';\n    tabId: number;\n} | {\n    kind: \'close-tab\';\n    tabId: number;\n};',
+    declaration: 'export type BrowserOperation = BrowserOpenTabSpec | {\n    kind: \'list-tabs\';\n} | ({\n    kind: \'read-page\';\n} & BrowserReadPageRequest) | BrowserInspectPageSpec | ({\n    kind: \'click-page-element\';\n} & BrowserPageTarget) | BrowserFillPageSpec | ({\n    kind: \'select-page-option\';\n} & BrowserSelectPageRequest) | BrowserScrollPageSpec | ({\n    kind: \'focus-page-element\';\n} & BrowserPageTarget) | BrowserPressPageSpec | BrowserWaitPageSpec | {\n    kind: \'activate-tab\';\n    tabId: number;\n} | {\n    kind: \'close-tab\';\n    tabId: number;\n};',
   },
   {
     name: 'BrowserOperationResult',
-    declaration: 'export type BrowserOperationResult = {\n    kind: \'open-tab\';\n    tab: BrowserTab;\n} | {\n    kind: \'list-tabs\';\n    tabs: BrowserTab[];\n} | {\n    kind: \'read-page\';\n    page: BrowserPage;\n} | {\n    kind: \'click-page-element\';\n    receipt: BrowserPageActionReceipt;\n} | {\n    kind: \'fill-page-element\';\n    receipt: BrowserPageActionReceipt;\n} | {\n    kind: \'select-page-option\';\n    receipt: BrowserPageActionReceipt;\n} | {\n    kind: \'scroll-page\';\n    receipt: BrowserScrollReceipt;\n} | {\n    kind: \'focus-page-element\';\n    receipt: BrowserPageActionReceipt;\n} | {\n    kind: \'press-page-key\';\n    receipt: BrowserPageActionReceipt;\n} | {\n    kind: \'wait-page\';\n    page: BrowserPage;\n} | {\n    kind: \'activate-tab\';\n    tab: BrowserTab;\n} | {\n    kind: \'close-tab\';\n    tabId: number;\n    closed: true;\n};',
+    declaration: 'export type BrowserOperationResult = {\n    kind: \'open-tab\';\n    tab: BrowserTab;\n} | {\n    kind: \'list-tabs\';\n    tabs: BrowserTab[];\n} | {\n    kind: \'read-page\';\n    page: BrowserPage;\n} | {\n    kind: \'inspect-page\';\n    inspect: BrowserPageInspect;\n} | {\n    kind: \'click-page-element\';\n    receipt: BrowserPageActionReceipt;\n} | {\n    kind: \'fill-page-element\';\n    receipt: BrowserPageActionReceipt;\n} | {\n    kind: \'select-page-option\';\n    receipt: BrowserPageActionReceipt;\n} | {\n    kind: \'scroll-page\';\n    receipt: BrowserScrollReceipt;\n} | {\n    kind: \'focus-page-element\';\n    receipt: BrowserPageActionReceipt;\n} | {\n    kind: \'press-page-key\';\n    receipt: BrowserPageActionReceipt;\n} | {\n    kind: \'wait-page\';\n    page: BrowserPage;\n} | {\n    kind: \'activate-tab\';\n    tab: BrowserTab;\n} | {\n    kind: \'close-tab\';\n    tabId: number;\n    closed: true;\n};',
   },
   {
     name: 'BrowserPage',
@@ -2986,6 +3101,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type BrowserPageId = Branded<\'BrowserPageId\'>;',
   },
   {
+    name: 'BrowserPageInspect',
+    declaration: 'export interface BrowserPageInspect {\n    tab: BrowserTab;\n    hooked: boolean;\n    hookedAt?: number;\n    network: BrowserNetworkEntry[];\n    console: BrowserConsoleEntry[];\n    omittedNetwork: number;\n    omittedConsole: number;\n}',
+  },
+  {
     name: 'BrowserPageOption',
     declaration: 'export interface BrowserPageOption {\n    value: string;\n    label: string;\n    selected: boolean;\n    disabled: boolean;\n}',
   },
@@ -3003,7 +3122,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'BrowserPressKey',
-    declaration: 'export type BrowserPressKey = \'Enter\' | \'Escape\' | \'Tab\' | \'Space\' | \'ArrowUp\' | \'ArrowDown\' | \'ArrowLeft\' | \'ArrowRight\' | \'Home\' | \'End\' | \'PageUp\' | \'PageDown\' | \'Backspace\' | \'Delete\';',
+    declaration: 'export type BrowserPressKey = (typeof PRESS_KEY_VALUES)[number];',
   },
   {
     name: 'BrowserPressModifiers',
@@ -3435,7 +3554,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'GenerateOptions',
-    declaration: 'export interface GenerateOptions {\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    messages: Message[];\n    system?: string;\n    tools?: ToolSchema[];\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n    signal?: AbortSignal;\n    sessionId?: Branded<\'SessionId\'>;\n    purpose?: \'compaction\' | \'session-title\' | \'image-transcription\';\n}',
+    declaration: 'export interface GenerateOptions {\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    messages: Message[];\n    system?: string;\n    tools?: ToolSchema[];\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n    signal?: AbortSignal;\n    sessionId?: Branded<\'SessionId\'>;\n    purpose?: \'compaction\' | \'session-title\' | \'image-transcription\' | \'memory\';\n}',
   },
   {
     name: 'GenericCallView',
@@ -3712,6 +3831,30 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ManualCompactAgentContext',
     declaration: 'export interface ManualCompactAgentContext extends CompactionAgentContext {\n    runMaintenance<T>(task: (signal: AbortSignal) => Promise<T>): Promise<T>;\n}',
+  },
+  {
+    name: 'MemoryFileEntry',
+    declaration: 'export interface MemoryFileEntry {\n    readonly path: string;\n    readonly bytes: number;\n}',
+  },
+  {
+    name: 'MemoryHandbook',
+    declaration: 'export interface MemoryHandbook {\n    readonly memoryMd: string;\n    readonly memorySummaryMd: string;\n    readonly skills?: readonly MemorySkillFile[];\n}',
+  },
+  {
+    name: 'MemoryNoteWrite',
+    declaration: 'export interface MemoryNoteWrite {\n    readonly content: string;\n    readonly slug?: string;\n}',
+  },
+  {
+    name: 'MemoryScope',
+    declaration: 'export type MemoryScope = \'user\' | \'project\';',
+  },
+  {
+    name: 'MemorySearchHit',
+    declaration: 'export interface MemorySearchHit {\n    readonly path: string;\n    readonly line: number;\n    readonly text: string;\n}',
+  },
+  {
+    name: 'MemorySkillFile',
+    declaration: 'export interface MemorySkillFile {\n    readonly name: string;\n    readonly content: string;\n}',
   },
   {
     name: 'Message',

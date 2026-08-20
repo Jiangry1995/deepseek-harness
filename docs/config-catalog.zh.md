@@ -1319,6 +1319,22 @@ export interface ReconnectConfig {
 
 来源：[`packages/mcp/mcp-client/src/index.ts:98`](../packages/mcp/mcp-client/src/index.ts)
 
+<a id="deepseek-aidsh-memory"></a>
+
+## `@deepseek-ai/dsh-memory`
+
+```ts config-catalog
+/** Plugin config for the file memory store. */
+export interface Config {
+  /** Absolute user-level memory root; required. */
+  userRoot: string
+  /** Project-level directory resolved against the agent cwd. Defaults to `.dsh/memory`. */
+  projectDir?: string
+}
+```
+
+来源：[`packages/memory/memory/src/index.ts:81`](../packages/memory/memory/src/index.ts)
+
 <a id="deepseek-aidsh-message-feedback"></a>
 
 ## `@deepseek-ai/dsh-message-feedback`
@@ -2558,6 +2574,34 @@ export interface Config {
 ```
 
 来源：[`packages/lsp/tool-lsp/src/index.ts:58`](../packages/lsp/tool-lsp/src/index.ts)
+
+<a id="deepseek-aidsh-tool-memory"></a>
+
+## `@deepseek-ai/dsh-tool-memory`
+
+需要：`memory` · `tools` · `systemPrompt`
+
+```ts config-catalog
+/** Plugin config for the memory tools and background pipeline. */
+export interface Config {
+  /** Register tools, inject the prompt, and run extraction. Defaults to true. */
+  enabled?: boolean
+  /** End-to-end auxiliary request deadline in milliseconds. */
+  timeoutMs?: number
+  /** Character cap on one turn's extraction transcript. */
+  maxTranscriptChars?: number
+  /** Character cap on each injected `memory_summary.md`. */
+  maxSummaryChars?: number
+  /** Output token cap for extraction and consolidation calls. */
+  maxOutputTokens?: number
+  /** Optional provider override; must be paired with `model`. */
+  provider?: string
+  /** Optional model override; must be paired with `provider`. */
+  model?: string
+}
+```
+
+来源：[`packages/memory/tool-memory/src/config.ts:19`](../packages/memory/tool-memory/src/config.ts)
 
 <a id="deepseek-aidsh-tool-pwsh"></a>
 

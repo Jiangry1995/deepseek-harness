@@ -416,6 +416,13 @@
 - id: tool-todo
   disabled: true
 
+# The memory STORE stays on the host plane (`ctx.memory`); only the
+# model-facing tools and prompt section move behind presets, matching
+# `tool-web` / `tool-todo`.
+
+- id: tool-memory
+  disabled: true
+
 - id: tool-web
   disabled: true
 

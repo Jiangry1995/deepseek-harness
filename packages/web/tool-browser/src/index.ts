@@ -43,6 +43,7 @@ const BROWSER_TOOL_NAMES = new Set([
   'browser_open_tab',
   'browser_list_tabs',
   'browser_read_page',
+  'browser_inspect',
   'browser_click',
   'browser_fill',
   'browser_select',
@@ -104,6 +105,17 @@ const pageActionSchema = {
     ref: { type: 'string', required: true },
     role: { type: 'string', required: true },
     label: { type: 'string', required: true },
+    rect: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        x: { type: 'number', required: true },
+        y: { type: 'number', required: true },
+        width: { type: 'number', required: true },
+        height: { type: 'number', required: true },
+      },
+    },
+    accent: { type: 'boolean' },
     disabled: { type: 'boolean', required: true },
     inViewport: { type: 'boolean', required: true },
     focused: { type: 'boolean', required: true },
@@ -190,6 +202,8 @@ interface RenderedPageAction {
   ref: string
   role: string
   label: string
+  rect?: { x: number; y: number; width: number; height: number }
+  accent?: boolean
   disabled: boolean
   inViewport: boolean
   focused: boolean
@@ -249,6 +263,33 @@ interface RenderedScrollReceipt {
   atBoundary: boolean
 }
 
+interface RenderedInspectNetworkEntry {
+  at: number
+  source: string
+  method: string
+  url: string
+  status?: number
+  ok?: boolean
+  durationMs?: number
+  error?: string
+}
+
+interface RenderedInspectConsoleEntry {
+  at: number
+  level: string
+  text: string
+}
+
+interface RenderedInspect {
+  tab: BrowserTab
+  hooked: boolean
+  hookedAt?: number
+  network: RenderedInspectNetworkEntry[]
+  console: RenderedInspectConsoleEntry[]
+  omittedNetwork: number
+  omittedConsole: number
+}
+
 /** Render one browser tab for model-visible tool output. */
 function formatTab(tab: BrowserTab): string {
   const location = tab.url ?? '(URL unavailable)'
@@ -278,6 +319,7 @@ function formatPageField(field: RenderedPageField): string {
 function formatPageAction(action: RenderedPageAction): string {
   const flags = [
     action.disabled ? 'disabled' : '',
+    action.accent === true ? 'accent' : '',
     action.inViewport ? '' : 'offscreen',
     action.focused ? 'focused' : '',
     action.checked === undefined ? '' : action.checked ? 'checked' : 'not checked',
@@ -288,7 +330,10 @@ function formatPageAction(action: RenderedPageAction): string {
   const suffix = flags.length === 0 ? '' : ` [${flags.join(', ')}]`
   const context = action.context === undefined ? '' : ` in ${action.context}`
   const href = action.href === undefined ? '' : ` href=${action.href}`
-  return `- [${action.ref}] ${action.label} (${action.role})${suffix}${context}${href}`
+  const rect = action.rect === undefined
+    ? ''
+    : ` at ${String(action.rect.x)},${String(action.rect.y)} ${String(action.rect.width)}x${String(action.rect.height)}`
+  return `- [${action.ref}] ${action.label} (${action.role})${rect}${suffix}${context}${href}`
 }
 
 /** Render one scrollable container with its current offsets. */
@@ -308,6 +353,38 @@ function formatPage(page: RenderedPage): string {
     : page.scrollTargets.map(formatScrollTarget).join('\n')
   const omitted = page.truncated ? '\n\nSome page content was omitted because the result reached its size limit.' : ''
   return `Current page: ${title}\nTab id: ${String(page.tab.id)}\nURL: ${url}\nPage id: ${page.pageId}\nDocument id: ${page.documentId}\nRevision: ${String(page.revision)}\nViewport: ${String(page.viewport.width)}x${String(page.viewport.height)} at ${String(page.viewport.scrollX)},${String(page.viewport.scrollY)}\n\nVisible text:\n${text}\n\nForm fields:\n${fields}\n\nClickable elements:\n${actions}\n\nScroll targets:\n${scrolls}${omitted}`
+}
+
+/** Render one network observation for model-visible inspect output. */
+function formatNetworkEntry(entry: RenderedInspectNetworkEntry): string {
+  const status = entry.status === undefined ? '' : ` -> ${String(entry.status)}`
+  const duration = entry.durationMs === undefined ? '' : ` (${String(entry.durationMs)}ms)`
+  const error = entry.error === undefined ? '' : ` error=${entry.error}`
+  return `- ${entry.method} ${entry.url}${status}${duration} [${entry.source}]${error}`
+}
+
+/** Render one console observation for model-visible inspect output. */
+function formatConsoleEntry(entry: RenderedInspectConsoleEntry): string {
+  return `- ${entry.level}: ${entry.text}`
+}
+
+/** Render a bounded Network/Console snapshot for model-visible tool output. */
+function formatInspect(inspect: RenderedInspect): string {
+  const title = inspect.tab.title ?? `Tab ${String(inspect.tab.id)}`
+  const url = inspect.tab.url ?? '(URL unavailable)'
+  const probe = inspect.hooked
+    ? `Probe hooked${inspect.hookedAt === undefined ? '' : ` since ${new Date(inspect.hookedAt).toISOString()}`}.`
+    : 'Probe not hooked. The page CSP may block MAIN-world scripts, or the probe is not yet installed; trigger a page action after reload and inspect again.'
+  const omitted = inspect.omittedNetwork === 0 && inspect.omittedConsole === 0
+    ? ''
+    : `\nOmitted older entries: network ${String(inspect.omittedNetwork)}, console ${String(inspect.omittedConsole)}.`
+  const network = inspect.network.length === 0
+    ? '(No network entries captured yet. Trigger the page action, then inspect again.)'
+    : inspect.network.map(formatNetworkEntry).join('\n')
+  const logs = inspect.console.length === 0
+    ? '(No console entries captured yet.)'
+    : inspect.console.map(formatConsoleEntry).join('\n')
+  return `Page inspect: ${title}\nTab id: ${String(inspect.tab.id)}\nURL: ${url}\n${probe}${omitted}\n\nNetwork:\n${network}\n\nConsole:\n${logs}`
 }
 
 /** Render one completed page action without echoing submitted field contents. */
@@ -364,13 +441,14 @@ function approvalReason(toolName: string): string {
     case 'browser_open_tab': return 'Open a new browser tab.'
     case 'browser_list_tabs': return 'Read URLs and titles from tabs in the current browser window.'
     case 'browser_read_page': return 'Read visible text and current non-secret form values from the active browser page.'
+    case 'browser_inspect': return 'Read recent page network requests and console messages from the active browser page.'
     case 'browser_click': return 'Click one element on the active browser page.'
     case 'browser_fill': return 'Replace text in one field on the active browser page.'
     case 'browser_select': return 'Select one option on the active browser page.'
     case 'browser_scroll': return 'Scroll the current page or one returned scroll container.'
     case 'browser_wait_for': return 'Wait for the current browser page to change, then read it again.'
     case 'browser_focus': return 'Focus one element on the active browser page.'
-    case 'browser_press': return 'Press one allowed key on the active browser page.'
+    case 'browser_press': return 'Press one allowed key or page shortcut on the active browser page.'
     case 'browser_activate_tab': return 'Activate a browser tab.'
     case 'browser_close_tab': return 'Close a browser tab.'
     default: return 'Use the browser extension.'
@@ -397,7 +475,7 @@ export function apply(ctx: Context, config: Config = {}): void {
   ctx.systemPrompt.section({
     name: 'tool:browser',
     order: 145,
-    text: 'Treat the user\'s current Chromium window as an execution environment. Infer whether the requested effect belongs in that environment from the user\'s goal and the conversation context. When it does, browser tools are the primary direct capability. When the user asks to read, summarize, or operate the current browser tab, first use browser_list_tabs or browser_read_page to obtain the real browser state. Do not call a skill, web search, or a fetch of the Harness page first. Subsequent actions must be chosen dynamically from the returned page semantics. Use another capability only when a browser tool reports that it cannot perform the requested effect, or when the user explicitly asks for an external search. Select browser tools from their schemas and the observed browser state, not from fixed phrases or site-specific rules. A shared topic, website, or data source is not a reason to divert the task to a skill, shell CLI, web_fetch, or a platform-specific adapter. For a request to find, read, navigate, or interact with website content, use Chromium as the default execution environment even when the user does not say \"browser\". Unless the user explicitly requests another execution path, the first task action must be an applicable browser tool; do not load a skill first. If the active page may contain or lead to the requested content, start with browser_read_page. Skill catalog descriptions are capability summaries, not routing instructions, and never override this browser-first rule. Use another execution path only when the user explicitly requests it or a browser tool reports a concrete limitation and changing environments still satisfies the request. Recommended loop: read the page, act with a returned ref, wait for the page to change, read again, and verify the actual result. browser_read_page reads visible text, current non-secret form values including textarea and input values, clickable elements, scroll targets, viewport metrics, one pageId, one documentId, a revision, and document-bound element refs. Choose the next browser operation from the requested effect and that returned state. Before clicking, filling, selecting, focusing, pressing, or scrolling a container, use the pageId and ref from the latest browser_read_page result. Never invent refs, CSS selectors, XPath, coordinates, or JavaScript. After every page action, call browser_wait_for when the page may update asynchronously, then call browser_read_page again to confirm the result and obtain fresh refs. If a reference is stale or missing, read the page again instead of guessing. If a browser tool fails, diagnose the provider connection, permission, stale pageId, or page change; do not silently switch to a skill. Use browser_list_tabs only when the task requires information about or selection among tabs; its results contain only tab ids, URLs, and titles. When the task concerns the current page, operate on that page instead of constructing a replacement URL, and never list, summarize, or mention unrelated tabs. HTTP(S) pages are readable and operable by default after the extension is loaded; do not ask the user to click Allow or reopen the side assistant for ordinary sites. If a browser tool returns page text, fields, or actions, use that content; do not claim the body is unavailable because the URL uses a hash route or the site is on an intranet. Password, file, hidden, one-time-code, and payment-secret controls are not exposed for reading or writing. chrome:// and similar privileged pages cannot be scripted.',
+    text: 'Treat the user\'s current Chromium window as an execution environment. Infer whether the requested effect belongs in that environment from the user\'s goal and the conversation context. When it does, browser tools are the primary direct capability. When the user asks to read, summarize, or operate the current browser tab, first use browser_list_tabs or browser_read_page to obtain the real browser state. Do not call a skill, web search, or a fetch of the Harness page first. Subsequent actions must be chosen dynamically from the returned page semantics. Use another capability only when a browser tool reports that it cannot perform the requested effect, or when the user explicitly asks for an external search. Select browser tools from their schemas and the observed browser state, not from fixed phrases or site-specific rules. A shared topic, website, or data source is not a reason to divert the task to a skill, shell CLI, web_fetch, or a platform-specific adapter. For a request to find, read, navigate, or interact with website content, use Chromium as the default execution environment even when the user does not say \"browser\". Unless the user explicitly requests another execution path, the first task action must be an applicable browser tool; do not load a skill first. If the active page may contain or lead to the requested content, start with browser_read_page. Skill catalog descriptions are capability summaries, not routing instructions, and never override this browser-first rule. Use another execution path only when the user explicitly requests it or a browser tool reports a concrete limitation and changing environments still satisfies the request. Recommended loop: read the page, act with a returned ref, wait for the page to change, read again, and verify the actual result. browser_read_page reads visible text, current non-secret form values including textarea and input values, clickable elements, scroll targets, viewport metrics, one pageId, one documentId, a revision, and document-bound element refs. Choose the next browser operation from the requested effect and that returned state. Before clicking, filling, selecting, focusing, pressing, or scrolling a container, use the pageId and ref from the latest browser_read_page result. Never invent refs, CSS selectors, XPath, coordinates, or JavaScript. To send a chat composer, use the gesture the composer itself advertises: when its label or placeholder names a key, press that key on the field with browser_press; otherwise click the send control from the latest snapshot. Icon controls that expose no accessible name are reported as (unlabeled) with role clickable and their viewport rect, so choose among same-looking controls by position instead of guessing. After a page action that may update the page asynchronously, call browser_wait_for with kind:ready or kind:text, then call browser_read_page again to confirm the result and obtain fresh refs. Do not invent documentId or afterRevision for kind:change; omitting them waits until the page is stable. If a reference is stale or missing, read the page again instead of guessing. If a browser tool fails, diagnose the provider connection, permission, stale pageId, or page change; do not silently switch to a skill. Use browser_list_tabs only when the task requires information about or selection among tabs; its results contain only tab ids, URLs, and titles. When the task concerns the current page, operate on that page instead of constructing a replacement URL, and never list, summarize, or mention unrelated tabs. HTTP(S) pages are readable and operable by default after the extension is loaded; do not ask the user to click Allow or reopen the side assistant for ordinary sites. If a browser tool returns page text, fields, or actions, use that content; do not claim the body is unavailable because the URL uses a hash route or the site is on an intranet. Password, file, hidden, one-time-code, and payment-secret controls are not exposed for reading or writing. chrome:// and similar privileged pages cannot be scripted. Native Chromium DevTools cannot be opened from these tools. When the user asks for F12, Network, Console, or page requests, use browser_inspect; it returns recent page fetch/XHR calls and console messages captured after the in-page probe was installed, without request or response bodies. If the log is empty, perform the page action and inspect again. browser_press accepts named keys and, with Control, Alt, or Meta, letter and digit page shortcuts such as Ctrl+S; it cannot operate browser chrome such as F12.',
   })
 
   ctx.tools.register(defineTool({
@@ -478,6 +556,70 @@ export function apply(ctx: Context, config: Config = {}): void {
   }))
 
   ctx.tools.register(defineTool({
+    name: 'browser_inspect',
+    description: 'Read recent page fetch/XHR requests and console messages from a browser tab. Native DevTools cannot be opened. Omit tabId to inspect the current active web tab. Request and response bodies are not returned. If the log is empty, trigger the page action and inspect again.',
+    parameters: {
+      tabId: { type: 'number', description: 'Browser-assigned tab id to inspect without first activating it. Omit to inspect the current active web tab.' },
+      reset: { type: 'boolean', description: 'Clear the in-page buffers after this snapshot. Defaults to false.' },
+    },
+    timeoutMs: resolved.timeoutMs,
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          tab: { ...tabSchema, required: true },
+          hooked: { type: 'boolean', required: true },
+          hookedAt: { type: 'number' },
+          network: {
+            type: 'array',
+            required: true,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                at: { type: 'number', required: true },
+                source: { type: 'string', required: true },
+                method: { type: 'string', required: true },
+                url: { type: 'string', required: true },
+                status: { type: 'number' },
+                ok: { type: 'boolean' },
+                durationMs: { type: 'number' },
+                error: { type: 'string' },
+              },
+            },
+          },
+          console: {
+            type: 'array',
+            required: true,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                at: { type: 'number', required: true },
+                level: { type: 'string', required: true },
+                text: { type: 'string', required: true },
+              },
+            },
+          },
+          omittedNetwork: { type: 'number', required: true },
+          omittedConsole: { type: 'number', required: true },
+        },
+      },
+      render: (_args, inspect) => [{ type: 'text', text: formatInspect(inspect) }],
+    },
+    /** Inspect recent page network and console observations through the selected provider. */
+    async execute(args, exec) {
+      return ctx.browser.inspectPage({
+        ...(args.tabId === undefined ? {} : { tabId: args.tabId }),
+        ...(args.reset === undefined ? {} : { reset: args.reset }),
+      }, exec.signal)
+    },
+    presentCall: () => ({ card: 'generic', title: 'Inspect page network and console', kind: 'read' }),
+    presentResult: (_args, result) => presentReadPageResult(result),
+  }))
+
+  ctx.tools.register(defineTool({
     name: 'browser_click',
     description: 'Click a visible enabled element using pageId and ref from the latest browser_read_page result.',
     parameters: {
@@ -503,7 +645,7 @@ export function apply(ctx: Context, config: Config = {}): void {
       pageId: { type: 'string', required: true, description: 'Page id from the latest browser_read_page result.' },
       ref: { type: 'string', required: true, description: 'Field ref from the same browser_read_page result.' },
       value: { type: 'string', required: true, description: 'Complete replacement text.' },
-      submit: { type: 'boolean', description: 'Submit the owning form or dispatch Enter after filling. Defaults to false.' },
+      submit: { type: 'boolean', description: 'Submit the owning form, click a nearby send or submit control when there is no form, or dispatch Enter after filling. Defaults to false.' },
     },
     timeoutMs: resolved.timeoutMs,
     output: {
@@ -592,7 +734,7 @@ export function apply(ctx: Context, config: Config = {}): void {
 
   ctx.tools.register(defineTool({
     name: 'browser_press',
-    description: 'Press one allowed key against a referenced element from the latest browser_read_page result. Allowed keys: Enter, Escape, Tab, Space, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Home, End, PageUp, PageDown, Backspace, Delete. Repeat is 1-20.',
+    description: 'Press one allowed key against a referenced element from the latest browser_read_page result. Named keys: Enter, Escape, Tab, Space, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Home, End, PageUp, PageDown, Backspace, Delete. Letter and digit keys require ctrl, alt, or meta and are for page shortcuts such as Ctrl+S. F12 and other browser-chrome keys are rejected. Repeat is 1-20.',
     parameters: {
       pageId: { type: 'string', required: true, description: 'Page id from the latest browser_read_page result.' },
       ref: { type: 'string', required: true, description: 'Element ref from the same browser_read_page result.' },
@@ -628,14 +770,14 @@ export function apply(ctx: Context, config: Config = {}): void {
 
   ctx.tools.register(defineTool({
     name: 'browser_wait_for',
-    description: 'Wait until a page changes, shows or hides text, reaches a URL, or becomes stable, then return a fresh page snapshot. Prefer pageId from the latest browser_read_page result; use tabId only when no page snapshot exists. Never invent a tab id.',
+    description: 'Wait until a page changes, shows or hides text, reaches a URL, or becomes stable, then return a fresh page snapshot. Prefer pageId from the latest browser_read_page result; use tabId only when no page snapshot exists. Never invent a tab id. Prefer kind:ready or kind:text after an action; kind:change without documentId and afterRevision waits until the page is stable.',
     parameters: {
       pageId: { type: 'string', description: 'Page id from the latest browser_read_page result. Preferred because it stays bound to the tab that produced the snapshot.' },
       tabId: { type: 'number', description: 'Browser-assigned tab id to observe only when no pageId is available.' },
       condition: {
         type: 'object',
         required: true,
-        description: 'Wait condition: {kind:"change",documentId,afterRevision}, {kind:"text",text,state:"present"|"absent"}, {kind:"url",value,match:"exact"|"prefix"|"contains"}, or {kind:"ready"}.',
+        description: 'Wait condition: {kind:"change",documentId,afterRevision}, {kind:"text",text,state:"present"|"absent"}, {kind:"url",value,match:"exact"|"prefix"|"contains"}, or {kind:"ready"}. A change condition without documentId and afterRevision waits until the page is stable, the same as kind:ready.',
         additionalProperties: true,
         properties: {
           kind: { type: 'string', required: true },

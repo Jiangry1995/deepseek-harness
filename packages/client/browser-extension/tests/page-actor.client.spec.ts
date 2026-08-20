@@ -88,6 +88,130 @@ describe('document-bound page actions', () => {
     expect(requestSubmit).toHaveBeenCalledTimes(1)
   })
 
+  it('clicks a nearby named send control when filling or pressing Enter without a form', () => {
+    setPage(`
+      <div class="el-editor-sender">
+        <textarea aria-label="输入"></textarea>
+        <div class="el-send-button">
+          <button type="button">新开对话</button>
+          <button type="button" aria-label="删除"></button>
+          <button type="button" aria-label="发送"></button>
+        </div>
+      </div>
+    `)
+    const page = readVisiblePage()
+    const newChat = document.querySelectorAll('button')[0]!
+    const remove = document.querySelectorAll('button')[1]!
+    const send = document.querySelectorAll('button')[2]!
+    const newChatClick = vi.fn()
+    const removeClick = vi.fn()
+    const sendClick = vi.fn()
+    newChat.addEventListener('click', newChatClick)
+    remove.addEventListener('click', removeClick)
+    send.addEventListener('click', sendClick)
+
+    actOnPage({ kind: 'fill-page-element', pageId: page.pageId, ref: 'e1', value: '你好', submit: true })
+    expect(sendClick).toHaveBeenCalledTimes(1)
+    expect(newChatClick).not.toHaveBeenCalled()
+    expect(removeClick).not.toHaveBeenCalled()
+
+    sendClick.mockClear()
+    actOnPage({
+      kind: 'press-page-key',
+      pageId: page.pageId,
+      ref: 'e1',
+      key: 'Enter',
+      modifiers: {},
+      repeat: 1,
+    })
+    expect(sendClick).toHaveBeenCalledTimes(1)
+    expect(newChatClick).not.toHaveBeenCalled()
+    expect(removeClick).not.toHaveBeenCalled()
+  })
+
+  it('clicks the named send button when the referenced node is icon markup or composer chrome', () => {
+    setPage(`
+      <div class="el-editor-sender">
+        <textarea aria-label="输入"></textarea>
+        <div class="el-send-button" id="cluster">
+          <button type="button">新开对话</button>
+          <button type="button" aria-label="删除"></button>
+          <button type="button" aria-label="发送" id="send"><span data-icon="send"></span></button>
+        </div>
+      </div>
+    `)
+    const page = readVisiblePage()
+    const cluster = document.querySelector<HTMLElement>('#cluster')!
+    const icon = document.querySelector<HTMLElement>('[data-icon="send"]')!
+    const send = document.querySelector<HTMLElement>('#send')!
+    const remove = document.querySelectorAll('button')[1]!
+    const sendClick = vi.fn()
+    const removeClick = vi.fn()
+    send.addEventListener('click', sendClick)
+    remove.addEventListener('click', removeClick)
+    icon.setAttribute('data-dsh-page-ref', 'icon')
+    cluster.setAttribute('data-dsh-page-ref', 'cluster')
+
+    actOnPage({ kind: 'click-page-element', pageId: page.pageId, ref: 'icon' })
+    expect(sendClick).toHaveBeenCalledTimes(1)
+    expect(removeClick).not.toHaveBeenCalled()
+
+    sendClick.mockClear()
+    actOnPage({ kind: 'click-page-element', pageId: page.pageId, ref: 'cluster' })
+    expect(sendClick).toHaveBeenCalledTimes(1)
+    expect(removeClick).not.toHaveBeenCalled()
+  })
+
+  it('sends a composer that gates Enter on the legacy keyCode', () => {
+    setPage('<div><textarea aria-label="输入问题，发送 [Enter]"></textarea></div>')
+    const page = readVisiblePage()
+    const textarea = document.querySelector('textarea')!
+    const send = vi.fn()
+    const observed: number[] = []
+    textarea.addEventListener('keydown', (event) => {
+      observed.push(event.keyCode, event.which)
+      if (event.keyCode === 13 && !event.shiftKey) {
+        send()
+        event.preventDefault()
+      }
+    })
+
+    actOnPage({ kind: 'press-page-key', pageId: page.pageId, ref: 'e1', key: 'Enter', modifiers: {}, repeat: 1 })
+    expect(observed).toEqual([13, 13])
+    expect(send).toHaveBeenCalledTimes(1)
+
+    send.mockClear()
+    actOnPage({ kind: 'fill-page-element', pageId: page.pageId, ref: 'e1', value: '你好', submit: true })
+    expect(send).toHaveBeenCalledTimes(1)
+  })
+
+  it('clicks a nearby send control when the composer prevents Enter without submitting', () => {
+    setPage(`
+      <div class="ch-chat-input">
+        <textarea aria-label="输入"></textarea>
+        <button type="button" aria-label="发送"></button>
+      </div>
+    `)
+    const page = readVisiblePage()
+    const textarea = document.querySelector('textarea')!
+    const send = document.querySelector('button')!
+    const sendClick = vi.fn()
+    send.addEventListener('click', sendClick)
+    textarea.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') event.preventDefault()
+    })
+
+    actOnPage({
+      kind: 'press-page-key',
+      pageId: page.pageId,
+      ref: 'e1',
+      key: 'Enter',
+      modifiers: {},
+      repeat: 1,
+    })
+    expect(sendClick).toHaveBeenCalledTimes(1)
+  })
+
   it('clicks referenced controls and selects native options by value or visible text', () => {
     setPage(`
       <button aria-label="搜索按钮">搜索</button>
@@ -217,6 +341,18 @@ describe('document-bound page actions', () => {
       repeat: 1,
     })).toMatchObject({ action: 'pressed', key: 'Tab' })
     expect(document.activeElement).not.toBe(name)
+
+    next.addEventListener('keydown', (event) => {
+      if (event.ctrlKey && event.key === 's') event.preventDefault()
+    })
+    expect(actOnPage({
+      kind: 'press-page-key',
+      pageId: page.pageId,
+      ref: 'e3',
+      key: 's',
+      modifiers: { ctrl: true },
+      repeat: 1,
+    })).toEqual({ pageId: page.pageId, ref: 'e3', action: 'pressed', key: 's' })
 
     expect(() => actOnPage({ kind: 'focus-page-element', pageId: '00000000-0000-4000-8000-000000000000', ref: 'e1' }))
       .toThrow(/BROWSER_PAGE_STALE/)

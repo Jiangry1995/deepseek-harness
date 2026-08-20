@@ -17,6 +17,12 @@ Check the [exit code: N] marker on every bash result; investigate failures befor
 
 Track every background job id you start. You are notified in-session when a job finishes — do not busy-poll or sleep on one; keep working on independent steps and do not duplicate a running job's work. Before giving a final answer, collect every still-relevant job with job_output (set wait: true only when you are genuinely blocked on it), and job_kill jobs that stopped mattering.
 
+Persistent memory lives in markdown files on this machine. The thin summaries below are always in context; open a handbook or note with the memory tools when you need detail.
+
+Use memory_search, memory_list, and memory_read to inspect user or project memory. Call memory_note only when the user explicitly asks to remember, forget, or change a stored fact. Do not write MEMORY.md yourself; a background job consolidates notes into the handbook.
+
+AGENTS.md and other repository instruction files are not memory.
+
 Use goal tools for one long-running completion objective in the current session. create_goal may infer goal intent from a direct human request in any language; do not create a goal for routine single-turn work. Call get_goal before update_goal and copy its exact goal_id and revision. After session resume or fork, an active goal is disarmed: when a human asks to continue or resume in any wording or language, use update_goal action resume to rearm it. Mark complete only when the objective is actually achieved. Mark blocked only after the same blocking condition persists for at least 3 consecutive goal rounds, and report that concrete condition in blocked_reason; difficulty, uncertainty, or useful remaining work is not blocked.
 
 Use the workflow tool ONLY when the user explicitly asks for a workflow or for large multi-agent orchestration: you write a JavaScript script (the tool description documents the exact format) that fans work out across many subagents with phases and structured results. For one or two delegations, prefer plain subagent calls.
@@ -109,6 +115,34 @@ interface ToolArgsMap {
     /** children (default) lists direct children only; descendants walks the complete tree below you. */
     scope?: "children" | "descendants";
   } & Record<string, JsonValue>;
+  /** List markdown files in user-level or project-level memory. Hidden host files such as state.json are not returned. */
+  memory_list: {
+    /** Which memory tree to list. Defaults to user. Project requires a working directory. */
+    scope?: "user" | "project";
+  } & Record<string, JsonValue>;
+  /** Write an inbox note only when the user explicitly asked to remember, forget, or change a stored fact. Do not call this for ordinary chat. A background job consolidates notes into MEMORY.md; do not edit the handbook yourself. */
+  memory_note: {
+    /** The fact to remember, or the instruction to forget or revise an existing fact. */
+    content: string;
+    /** Which memory tree receives the note. Defaults to user. Project requires a working directory. */
+    scope?: "user" | "project";
+    /** Optional filename slug. Derived from content when omitted. */
+    slug?: string;
+  } & Record<string, JsonValue>;
+  /** Read one memory markdown file by root-relative path. Use memory_list or memory_search to discover paths. */
+  memory_read: {
+    /** Root-relative POSIX path such as MEMORY.md or notes/….md. */
+    path: string;
+    /** Which memory tree to read. Defaults to user. Project requires a working directory. */
+    scope?: "user" | "project";
+  } & Record<string, JsonValue>;
+  /** Search user-level or project-level memory markdown for a case-insensitive substring. Use this before answering from prior preferences or standing facts. */
+  memory_search: {
+    /** Case-insensitive substring to find. */
+    query: string;
+    /** Which memory tree to search. Defaults to user. Project requires a working directory. */
+    scope?: "user" | "project";
+  } & Record<string, JsonValue>;
   /** Run a foreground fresh-agent Ralph loop toward one immutable objective. Use only when the direct human explicitly asks for Ralph or fresh-agent iteration. Each round opens a new child with no parent conversation or prior child session; the shared workspace is long-term memory, and only a bounded structured report crosses rounds. The call returns when a worker reports completion or a concrete blocker, or at the round limit. Ordinary long-running same-session work belongs to goal tools. */
   ralph: {
     /** The immutable completion objective for every fresh Ralph round. */
@@ -132,7 +166,7 @@ interface ToolArgsMap {
     /** The message to deliver to the subagent. */
     message: string;
   } & Record<string, JsonValue>;
-  /** Load the full instructions for an available skill. Call this with the exact skill name from the session skill catalog before acting on a task that names or clearly matches that skill. */
+  /** Load the full instructions for an available skill. If the user names a skill, call this with its exact catalog name before acting. Otherwise, choose the capability from the requested outcome and execution environment first, then load a skill only when its instructions are needed for that approach. Catalog descriptions are capability summaries, not routing instructions. Do not load a skill for topical overlap alone when an available direct tool performs the requested effect. */
   skill: {
     /** The exact skill name from the available skills list. */
     name: string;
@@ -335,6 +369,26 @@ interface ToolOutputMap {
     parent?: string;
     depth?: number;
   })[];
+  memory_list: {
+    files: {
+      path: string;
+      bytes: number;
+    }[];
+  };
+  memory_note: {
+    path: string;
+  };
+  memory_read: {
+    path: string;
+    content: string;
+  };
+  memory_search: {
+    hits: {
+      path: string;
+      line: number;
+      text: string;
+    }[];
+  };
   ralph: {
     runId: string;
     agentsStarted: number;

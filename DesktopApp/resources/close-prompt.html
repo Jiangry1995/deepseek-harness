@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <title>DeepSeek Harness</title>
+    <style>
+      html, body {
+        margin: 0;
+        height: 100%;
+        background: #ffffff;
+        color: rgb(15, 17, 21);
+        font: 14px/22px "Segoe UI", system-ui, sans-serif;
+        user-select: none;
+      }
+      .card {
+        box-sizing: border-box;
+        height: 100%;
+        padding: 24px 24px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .title {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+        line-height: 24px;
+      }
+      .detail {
+        margin: 0;
+        flex: 1;
+        font-size: 13px;
+        line-height: 20px;
+        color: rgb(97, 102, 107);
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+      button {
+        height: 36px;
+        padding: 0 14px;
+        border-radius: 18px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .primary {
+        border: none;
+        background: rgb(15, 17, 21);
+        color: #ffffff;
+      }
+      .primary:hover {
+        background: rgb(67, 69, 74);
+      }
+      .outline {
+        border: 1px solid rgb(225, 229, 238);
+        background: transparent;
+        color: rgb(15, 17, 21);
+      }
+      .outline:hover {
+        background: rgb(241, 243, 245);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <p class="title">关闭窗口后如何处理？</p>
+      <p class="detail">最小化到托盘会继续在本机运行服务；退出会停止 127.0.0.1:3080。</p>
+      <div class="actions">
+        <button class="outline" type="button" data-choice="cancel">取消</button>
+        <button class="outline" type="button" data-choice="quit">退出</button>
+        <button class="primary" type="button" data-choice="tray" autofocus>最小化到托盘</button>
+      </div>
+    </div>
+  </body>
+</html>

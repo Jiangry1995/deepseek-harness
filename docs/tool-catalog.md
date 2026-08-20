@@ -29,6 +29,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-goal` | `create_goal`, `get_goal`, `update_goal` | `ctx.tools`, `ctx.agents`, `ctx.goals`, `ctx.systemPrompt`, `a calling Agent in an authorized open turn` | `tool/call`, `goal/change for mutations`, `tool/result` | - | create, edit, pause, and resume require direct-human root authority; complete and blocked also accept the exact current goal round. The default blocked lower bound is three admitted rounds. |
 | `@deepseek-ai/dsh-schedule` | `schedule_create`, `schedule_delete`, `schedule_list` | `ctx.tools`, `ctx.sessions`, `Session persistence`, `a future live root Agent` | `tool/call`, `schedule/change create or delete`, `tool/result` | - | Registered only inside live root Agent scopes created after the opt-in Schedule plugin loads. Version 1 accepts after_seconds, explicit absolute at, and bounded fixed-rate every_seconds, and discloses session-local delivery; management reads and mutations require the shared Session persistence barrier. |
 | `@deepseek-ai/dsh-tool-lsp` | `lsp` | `ctx.tools`, `ctx.lsp`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema. |
+| `@deepseek-ai/dsh-tool-memory` | `memory_list`, `memory_note`, `memory_read`, `memory_search` | `ctx.tools`, `ctx.memory`, `ctx.systemPrompt`, `owning Agent session` | `tool/call`, `tool/result`, `host markdown under the user or project memory root` | - | memory_search, memory_list, memory_read, and memory_note are session-owned file tools. Extraction and consolidation run in the background over ctx.llm when that service is composed; this catalog harvests schemas without mounting llm. |
 | `@deepseek-ai/dsh-tool-ralph` | `ralph` | `ctx.tools`, `ctx.workflowEngine`, `ctx.subagents`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents every fresh round)` | `tool/call`, `tool/result`, `workflow and child session events during execution` | - | A fixed foreground workflow starts one fresh structured child per round; the model selects only the immutable objective and an optional round cap. |
 | `@deepseek-ai/dsh-tool-skill` | `skill` | `ctx.tools`, `ctx.agents`, `ctx.skills` | `tool/call`, `tool/result`, `user/message replacement catalogs via agent.inject()` | - | - |
 | `@deepseek-ai/dsh-tool-session-query` | `session_event_read`, `session_event_search`, `session_event_trace`, `session_search`, `session_trace` | `ctx.tools`, `ctx.systemPrompt`, `ctx.sessionQuery`, `a calling Agent for workspace authority` | `tool/call`, `tool/result` | - | The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The package is opt-in; compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies. |
@@ -38,7 +39,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-jobs` | `job_kill`, `job_list`, `job_output` | `ctx.tools`, `ctx.jobs`, `ctx.systemPrompt` | `tool/call`, `tool/result`, `user/message via agent.inject() for background completion notices` | - | The kind-agnostic background-job controller: background bash commands, PTY sends, and subagents are read, listed, and killed through the same three tools. Loading the plugin attaches the controller that arms producers' `ctx.jobs.start()`. |
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`, `owning Agent session` | `tool/call`, `todo/write`, `tool/result` | - | todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task. |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`, `ctx.workflowEngine`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents the script children)` | `tool/call`, `tool/result` | - | - |
-| `@deepseek-ai/dsh-tool-browser` | `browser_activate_tab`, `browser_click`, `browser_close_tab`, `browser_fill`, `browser_focus`, `browser_list_tabs`, `browser_open_tab`, `browser_press`, `browser_read_page`, `browser_scroll`, `browser_select`, `browser_wait_for` | `ctx.tools`, `ctx.browser`, `ctx.systemPrompt` | `tool/call`, `browser/command Remote event`, `tool/result` | - | Browser tools keep the MV3 provider and leased Host routing behind ctx.browser; every operation enters the approval chain by default. |
+| `@deepseek-ai/dsh-tool-browser` | `browser_activate_tab`, `browser_click`, `browser_close_tab`, `browser_fill`, `browser_focus`, `browser_inspect`, `browser_list_tabs`, `browser_open_tab`, `browser_press`, `browser_read_page`, `browser_scroll`, `browser_select`, `browser_wait_for` | `ctx.tools`, `ctx.browser`, `ctx.systemPrompt` | `tool/call`, `browser/command Remote event`, `tool/result` | - | Browser tools keep the MV3 provider and leased Host routing behind ctx.browser; every operation enters the approval chain by default. |
 | `@deepseek-ai/dsh-tool-web` | `web_fetch`, `web_search` | `ctx.tools`, `ctx.web`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps. |
 
 <a id="deepseek-aidsh-tool-ask-user"></a>
@@ -1178,6 +1179,125 @@ Source: [`packages/lsp/tool-lsp/src/index.ts`](../packages/lsp/tool-lsp/src/inde
 
 The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema.
 
+<a id="deepseek-aidsh-tool-memory"></a>
+
+## `@deepseek-ai/dsh-tool-memory`
+
+### `memory_list`
+
+List markdown files in user-level or project-level memory. Hidden host files such as state.json are not returned.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "scope": {
+      "type": "string",
+      "description": "Which memory tree to list. Defaults to user. Project requires a working directory.",
+      "enum": [
+        "user",
+        "project"
+      ]
+    }
+  }
+}
+```
+
+Source: [`packages/memory/tool-memory/src/index.ts`](../packages/memory/tool-memory/src/index.ts)
+
+### `memory_note`
+
+Write an inbox note only when the user explicitly asked to remember, forget, or change a stored fact. Do not call this for ordinary chat. A background job consolidates notes into MEMORY.md; do not edit the handbook yourself.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "content": {
+      "type": "string",
+      "description": "The fact to remember, or the instruction to forget or revise an existing fact."
+    },
+    "scope": {
+      "type": "string",
+      "description": "Which memory tree receives the note. Defaults to user. Project requires a working directory.",
+      "enum": [
+        "user",
+        "project"
+      ]
+    },
+    "slug": {
+      "type": "string",
+      "description": "Optional filename slug. Derived from content when omitted."
+    }
+  },
+  "required": [
+    "content"
+  ]
+}
+```
+
+Source: [`packages/memory/tool-memory/src/index.ts`](../packages/memory/tool-memory/src/index.ts)
+
+### `memory_read`
+
+Read one memory markdown file by root-relative path. Use memory_list or memory_search to discover paths.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "path": {
+      "type": "string",
+      "description": "Root-relative POSIX path such as MEMORY.md or notes/….md."
+    },
+    "scope": {
+      "type": "string",
+      "description": "Which memory tree to read. Defaults to user. Project requires a working directory.",
+      "enum": [
+        "user",
+        "project"
+      ]
+    }
+  },
+  "required": [
+    "path"
+  ]
+}
+```
+
+Source: [`packages/memory/tool-memory/src/index.ts`](../packages/memory/tool-memory/src/index.ts)
+
+### `memory_search`
+
+Search user-level or project-level memory markdown for a case-insensitive substring. Use this before answering from prior preferences or standing facts.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "query": {
+      "type": "string",
+      "description": "Case-insensitive substring to find."
+    },
+    "scope": {
+      "type": "string",
+      "description": "Which memory tree to search. Defaults to user. Project requires a working directory.",
+      "enum": [
+        "user",
+        "project"
+      ]
+    }
+  },
+  "required": [
+    "query"
+  ]
+}
+```
+
+Source: [`packages/memory/tool-memory/src/index.ts`](../packages/memory/tool-memory/src/index.ts)
+
+memory_search, memory_list, memory_read, and memory_note are session-owned file tools. Extraction and consolidation run in the background over ctx.llm when that service is composed; this catalog harvests schemas without mounting llm.
+
 <a id="deepseek-aidsh-tool-ralph"></a>
 
 ## `@deepseek-ai/dsh-tool-ralph`
@@ -1919,7 +2039,7 @@ Replace text in a visible editable field using pageId and ref from the latest br
     },
     "submit": {
       "type": "boolean",
-      "description": "Submit the owning form or dispatch Enter after filling. Defaults to false."
+      "description": "Submit the owning form, click a nearby send or submit control when there is no form, or dispatch Enter after filling. Defaults to false."
     }
   },
   "required": [
@@ -1953,6 +2073,28 @@ Focus a field or focusable action using pageId and ref from the latest browser_r
     "pageId",
     "ref"
   ]
+}
+```
+
+Source: [`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_inspect`
+
+Read recent page fetch/XHR requests and console messages from a browser tab. Native DevTools cannot be opened. Omit tabId to inspect the current active web tab. Request and response bodies are not returned. If the log is empty, trigger the page action and inspect again.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "tabId": {
+      "type": "number",
+      "description": "Browser-assigned tab id to inspect without first activating it. Omit to inspect the current active web tab."
+    },
+    "reset": {
+      "type": "boolean",
+      "description": "Clear the in-page buffers after this snapshot. Defaults to false."
+    }
+  }
 }
 ```
 
@@ -1998,7 +2140,7 @@ Source: [`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/
 
 ### `browser_press`
 
-Press one allowed key against a referenced element from the latest browser_read_page result. Allowed keys: Enter, Escape, Tab, Space, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Home, End, PageUp, PageDown, Backspace, Delete. Repeat is 1-20.
+Press one allowed key against a referenced element from the latest browser_read_page result. Named keys: Enter, Escape, Tab, Space, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Home, End, PageUp, PageDown, Backspace, Delete. Letter and digit keys require ctrl, alt, or meta and are for page shortcuts such as Ctrl+S. F12 and other browser-chrome keys are rejected. Repeat is 1-20.
 
 ```json
 {
@@ -2128,7 +2270,7 @@ Source: [`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/
 
 ### `browser_wait_for`
 
-Wait until a page changes, shows or hides text, reaches a URL, or becomes stable, then return a fresh page snapshot. Prefer pageId from the latest browser_read_page result; use tabId only when no page snapshot exists. Never invent a tab id.
+Wait until a page changes, shows or hides text, reaches a URL, or becomes stable, then return a fresh page snapshot. Prefer pageId from the latest browser_read_page result; use tabId only when no page snapshot exists. Never invent a tab id. Prefer kind:ready or kind:text after an action; kind:change without documentId and afterRevision waits until the page is stable.
 
 ```json
 {
@@ -2144,7 +2286,7 @@ Wait until a page changes, shows or hides text, reaches a URL, or becomes stable
     },
     "condition": {
       "type": "object",
-      "description": "Wait condition: {kind:\"change\",documentId,afterRevision}, {kind:\"text\",text,state:\"present\"|\"absent\"}, {kind:\"url\",value,match:\"exact\"|\"prefix\"|\"contains\"}, or {kind:\"ready\"}.",
+      "description": "Wait condition: {kind:\"change\",documentId,afterRevision}, {kind:\"text\",text,state:\"present\"|\"absent\"}, {kind:\"url\",value,match:\"exact\"|\"prefix\"|\"contains\"}, or {kind:\"ready\"}. A change condition without documentId and afterRevision waits until the page is stable, the same as kind:ready.",
       "additionalProperties": true,
       "properties": {
         "kind": {

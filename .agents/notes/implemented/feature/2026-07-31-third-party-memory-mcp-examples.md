@@ -76,3 +76,9 @@ Before merge, manual evidence for every pinned provider must separately show:
 Selecting a file gives the model the provider's complete discovered MCP tool surface, with schema/token cost determined by that provider. Removing `--config` removes the memory server. Users accept each upstream license, data policy, cloud cost, and operational model directly.
 
 The earlier vendor-specific change is superseded by this generic path. Future provider drift is handled by updating and revalidating a small example pin rather than adding runtime branches to DSH.
+
+This decision rejects making third-party memory MCP servers into official DSH product surface. It does not reject a first-party on-disk markdown store; that capability is owned by [first-party file memory](2026-08-18-first-party-file-memory.md).
+
+## Related
+
+[First-party file memory](2026-08-18-first-party-file-memory.md)

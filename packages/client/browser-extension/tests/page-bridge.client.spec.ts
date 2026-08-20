@@ -258,6 +258,60 @@ describe('Client extension provider lifecycle', () => {
     expect(browser.disconnect).toHaveBeenCalledWith(lease.clientId)
   })
 
+  it('keeps wait-page on the page bridge past the lease-only request timeout', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000002')
+    const lease = { clientId: 'wait-client', leaseMs: 100_000, requestTimeoutMs: 2_000 }
+    const browser = {
+      connect: vi.fn().mockResolvedValue(ok(lease)),
+      heartbeat: vi.fn().mockResolvedValue(ok(lease)),
+      complete: vi.fn().mockResolvedValue(ok({ accepted: true })),
+      disconnect: vi.fn().mockResolvedValue(ok({ disconnected: true })),
+    }
+    let commandListener!: (command: unknown) => void
+    const remote = {
+      browser,
+      $on: vi.fn((_event: string, listener: (command: unknown) => void) => { commandListener = listener }),
+    }
+    const ctx = new Context()
+    ctx.provide('remote', remote as never)
+    ctx.provide('remote.browser', browser as never)
+    vi.spyOn(window, 'postMessage').mockImplementation(() => {})
+    const fiber = ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+
+    emitWindow({ channel: BROWSER_EXTENSION_CHANNEL, version: BROWSER_EXTENSION_PROTOCOL_VERSION, direction: 'ready' })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(browser.connect).toHaveBeenCalledOnce()
+
+    commandListener({
+      requestId: 'wait-request-1',
+      clientId: lease.clientId,
+      operation: {
+        kind: 'wait-page',
+        pageId: '11111111-1111-4111-8111-111111111111',
+        condition: { kind: 'text', text: 'loading', state: 'absent' },
+        timeoutMs: 5_000,
+        stableMs: 150,
+      },
+    })
+    await vi.advanceTimersByTimeAsync(1_001)
+    expect(browser.complete).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(4_499)
+    await Promise.resolve()
+    expect(browser.complete).toHaveBeenCalledWith({
+      requestId: 'wait-request-1',
+      clientId: lease.clientId,
+      response: {
+        ok: false,
+        error: { code: 'BROWSER_API_FAILED', message: 'browser extension bridge response timed out' },
+      },
+    })
+
+    await fiber.dispose()
+  })
+
   it('renews the active provider lease at half the advertised duration', async () => {
     vi.useFakeTimers()
     const lease = { clientId: 'heartbeat-client', leaseMs: 100, requestTimeoutMs: 500 }

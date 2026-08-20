@@ -1391,6 +1391,36 @@
       "source": "packages/spill/spill/src/types.ts"
     },
     {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryScope",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryFileEntry",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemorySearchHit",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryNoteWrite",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemorySkillFile",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/memory.md",
+      "symbol": "MemoryHandbook",
+      "source": "packages/memory/memory/src/types.ts"
+    },
+    {
       "doc": "docs/subsystems/workflow.md",
       "symbol": "WorkflowStartRequest",
       "source": "packages/workflow/workflow/src/runtime-types.ts"

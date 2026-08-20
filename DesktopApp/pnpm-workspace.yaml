@@ -1,0 +1,7 @@
+# Nested project: keep this directory out of the parent monorepo workspaces.
+packages: []
+
+allowBuilds:
+  electron: true
+  electron-winstaller: true
+  esbuild: true

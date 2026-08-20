@@ -110,14 +110,21 @@ export function resolveProfileDir(name: string, home: string = resolveDshHome())
   return join(home, PROFILES_DIR, name)
 }
 
-/** The shipped profile templates auto-initialized on first use, by name. */
+/**
+ * The shipped profile templates auto-initialized on first use, by name.
+ * Web includes the dormant automatic-vision bundle so desktop/H5 installs
+ * expose Settings → Plugins → Automatic vision without a separate
+ * `dsh plugin add`. The helper stays idle until the user picks a visual route.
+ */
 export const PROFILE_TEMPLATES: Record<string, readonly string[]> = {
-  web: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'],
+  web: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@deepseek-ai/dsh-vision-fallback'],
   headless: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless'],
 }
 
 /** Installation-owned bundle tuples normalized to the shipped template. */
 const INSTALLATION_OWNED_PROFILE_TUPLES: Record<string, readonly string[]> = {
+  // Stock web profiles created before vision-fallback joined the template.
+  web: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'],
   headless: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@deepseek-ai/dsh-headless'],
 }
 
@@ -293,6 +300,8 @@ function sameBundles(left: readonly string[], right: readonly string[]): boolean
 /**
  * Normalize an exact installation-owned bundle tuple to its shipped template
  * while preserving every other manifest field. Any other list is user-owned.
+ * Web uses this to add `@deepseek-ai/dsh-vision-fallback` onto profiles that
+ * still have the pre-vision two-bundle list.
  */
 function normalizeShippedProfile(name: string, dir: string, manifest: ProfileManifest): ProfileManifest {
   const installationOwned = INSTALLATION_OWNED_PROFILE_TUPLES[name]

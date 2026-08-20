@@ -152,6 +152,17 @@
   config:
     allowParallelInProgress: true
 
+# First-party markdown memory. The store is session-cwd + $DSH_HOME; the
+# tools and HOWTO are model-facing. Snapshot replay does not consume
+# conversation fixtures for purpose:memory auxiliary calls.
+- id: memory
+  name: '@deepseek-ai/dsh-memory'
+  config:
+    userRoot: !!js (process.env.DSH_HOME ?? '.dsh') + '/memory'
+
+- id: tool-memory
+  name: '@deepseek-ai/dsh-tool-memory'
+
 # Identical repeat calls trigger advisory context, never a block, at the default
 # thresholds [3, 5, 8]. Only the repeat-tool-reminder snapshot scenario reaches them.
 - id: repeat-tool-reminder

@@ -34,6 +34,10 @@ export class PageActionError extends Error {
 }
 
 const LINE_SCROLL_PX = 40
+const SKIP_KEYPRESS = new Set<BridgePressKey>([
+  'Tab', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+  'Home', 'End', 'PageUp', 'PageDown', 'Backspace', 'Delete',
+])
 
 /** Collect the main document and accessible same-origin child-frame documents. */
 function pageDocuments(): Document[] {
@@ -144,14 +148,83 @@ function dispatchValueEvents(element: HTMLElement, value: string): void {
   element.dispatchEvent(new Event('change', { bubbles: true, composed: true }))
 }
 
-/** Submit the owning form or dispatch an Enter sequence for standalone search controls. */
+/** Submit the owning form, click a nearby send control, or dispatch Enter for standalone search. */
 function submitElement(element: HTMLElement): void {
   const form = element.closest('form')
   if (form instanceof HTMLFormElement) {
     form.requestSubmit()
     return
   }
+  const send = findComposerSubmitButton(element)
+  if (send !== undefined) {
+    clickElement(send)
+    return
+  }
+  if (element instanceof HTMLButtonElement || element.getAttribute('role') === 'button') {
+    element.click()
+    return
+  }
   dispatchKeySequence(element, 'Enter', {})
+}
+
+const COMPOSER_SCOPE_SELECTOR = 'form, [role="form"], .el-editor-sender, .ch-chat-input, [class*="editor-sender"]'
+const SEND_CONTROL_NAME = /发送|send|submit|提交/i
+const REJECT_CONTROL_NAME = /删除|delete|清空|clear|关闭|close|取消|cancel|新开对话|new chat|new conversation/i
+const COMPOSER_CONTROL_SELECTOR = 'button, [role="button"], input[type="submit"]'
+const COMPOSER_ANCESTOR_WALK = 8
+
+/** Collect accessible names used to recognize send versus destructive composer controls. */
+function controlName(element: HTMLElement): string {
+  return [
+    element.getAttribute('aria-label'),
+    element.getAttribute('title'),
+    element.innerText || element.textContent,
+  ].filter(candidate => candidate !== null && candidate !== '').join(' ')
+}
+
+/** Return whether one control is a native form submit button. */
+function isNativeSubmitControl(element: HTMLElement): boolean {
+  return (element instanceof HTMLInputElement || element instanceof HTMLButtonElement) && element.type === 'submit'
+}
+
+/**
+ * Find an enabled send or submit control inside one composer subtree.
+ * Named send/submit wins; otherwise a native submit; otherwise the unique remaining non-destructive button.
+ * Destructive names such as delete are never chosen, including the first button in a send-button cluster.
+ */
+function submitButtonIn(scope: ParentNode, from: HTMLElement): HTMLElement | undefined {
+  const controls = [...scope.querySelectorAll<HTMLElement>(COMPOSER_CONTROL_SELECTOR)]
+    .filter(element => element !== from && !isDisabled(element))
+  const namedSend = controls.find((element) => {
+    const name = controlName(element)
+    return SEND_CONTROL_NAME.test(name) && !REJECT_CONTROL_NAME.test(name)
+  })
+  if (namedSend !== undefined) return namedSend
+  const nativeSubmit = controls.find(element => isNativeSubmitControl(element) && !REJECT_CONTROL_NAME.test(controlName(element)))
+  if (nativeSubmit !== undefined) return nativeSubmit
+  const remaining = controls.filter(element => !REJECT_CONTROL_NAME.test(controlName(element)))
+  return remaining.length === 1 ? remaining[0] : undefined
+}
+
+/** Locate a nearby composer send control when the filled field is not inside a native form. */
+function findComposerSubmitButton(from: HTMLElement): HTMLElement | undefined {
+  const closest = from.closest<HTMLElement>(COMPOSER_SCOPE_SELECTOR)
+  if (closest !== null) return submitButtonIn(closest, from)
+  let scope: HTMLElement | null = from.parentElement
+  for (let depth = 0; depth < COMPOSER_ANCESTOR_WALK && scope !== null; depth += 1) {
+    const found = submitButtonIn(scope, from)
+    if (found !== undefined) return found
+    scope = scope.parentElement
+  }
+  return undefined
+}
+
+/** Click a nearby send control when Enter was prevented on a non-form composer field. */
+function submitStandaloneComposer(element: HTMLElement): void {
+  if (element.closest('form') instanceof HTMLFormElement) return
+  const send = findComposerSubmitButton(element)
+  if (send === undefined || send === element) return
+  clickElement(send)
 }
 
 /** Return the current user-visible text stored by one filled control. */
@@ -185,6 +258,7 @@ function fillElement(element: HTMLElement, value: string, submit: boolean): void
     if (expected !== '' && actual !== expected && !actual.includes(expected)) {
       throw new PageActionError('BROWSER_ELEMENT_NOT_EDITABLE', 'the contenteditable value did not match the requested text')
     }
+    element.dispatchEvent(new Event('change', { bubbles: true, composed: true }))
     if (submit) submitElement(element)
     return
   } else {
@@ -197,11 +271,62 @@ function fillElement(element: HTMLElement, value: string, submit: boolean): void
   if (submit) submitElement(element)
 }
 
-/** Click one enabled referenced element. */
-function clickElement(element: HTMLElement): void {
-  if (isDisabled(element)) throw new PageActionError('BROWSER_ELEMENT_DISABLED', 'the referenced element is disabled')
-  element.focus()
+/** Return whether one element is a native or ARIA control that should receive the click. */
+function isActivationControl(element: HTMLElement): boolean {
+  if (isDisabled(element)) return false
+  if (element instanceof HTMLButtonElement) return true
+  if (element instanceof HTMLAnchorElement && element.getAttribute('href') !== null) return true
+  if (element instanceof HTMLInputElement) {
+    return ['button', 'submit', 'reset', 'image', 'checkbox', 'radio'].includes(element.type)
+  }
+  const role = element.getAttribute('role')
+  return role === 'button' || role === 'link' || role === 'tab' || role === 'menuitem'
+    || role === 'option' || role === 'checkbox' || role === 'radio'
+}
+
+/**
+ * Resolve the control a click should activate.
+ * Icon markup and composer chrome are often the referenced node; the named send or nearest button is the effect.
+ */
+function activationTarget(element: HTMLElement): HTMLElement {
+  if (isActivationControl(element)) return element
+  const closest = element.closest('button, a[href], input[type="button"], input[type="submit"], [role="button"]')
+  if (closest instanceof HTMLElement && isActivationControl(closest)) return closest
+  const send = findComposerSubmitButton(element)
+  if (send !== undefined) return send
+  const nested = [...element.querySelectorAll<HTMLElement>(COMPOSER_CONTROL_SELECTOR)]
+    .filter(candidate => isActivationControl(candidate) && !REJECT_CONTROL_NAME.test(controlName(candidate)))
+  const only = nested[0]
+  return nested.length === 1 && only !== undefined ? only : element
+}
+
+/** Dispatch a pointer sequence then a native click so framework click and pointer handlers both run. */
+function dispatchActivation(element: HTMLElement): void {
+  const mouseInit: MouseEventInit = {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    button: 0,
+  }
+  if (typeof PointerEvent === 'function') {
+    const pointerInit = { ...mouseInit, pointerId: 1, pointerType: 'mouse' as const }
+    element.dispatchEvent(new PointerEvent('pointerdown', pointerInit))
+    element.dispatchEvent(new MouseEvent('mousedown', mouseInit))
+    element.dispatchEvent(new PointerEvent('pointerup', pointerInit))
+    element.dispatchEvent(new MouseEvent('mouseup', mouseInit))
+  } else {
+    element.dispatchEvent(new MouseEvent('mousedown', mouseInit))
+    element.dispatchEvent(new MouseEvent('mouseup', mouseInit))
+  }
   element.click()
+}
+
+/** Click the activation target of one referenced element. */
+function clickElement(element: HTMLElement): void {
+  const target = activationTarget(element)
+  if (isDisabled(target)) throw new PageActionError('BROWSER_ELEMENT_DISABLED', 'the referenced element is disabled')
+  target.focus()
+  dispatchActivation(target)
 }
 
 /** Select one native option by exact value or normalized visible text. */
@@ -318,22 +443,67 @@ function focusElement(element: HTMLElement): void {
   }
 }
 
+/** Map a bounded key onto KeyboardEvent.code. */
+function keyCode(key: BridgePressKey): string {
+  if (key === 'Space') return 'Space'
+  if (key.length === 1 && key >= 'a' && key <= 'z') return `Key${key.toUpperCase()}`
+  if (key.length === 1 && key >= '0' && key <= '9') return `Digit${key}`
+  return key
+}
+
+/** Map a bounded key onto KeyboardEvent.key, applying Shift for letters. */
+function eventKeyFor(key: BridgePressKey, shift: boolean): string {
+  if (key === 'Space') return ' '
+  if (key.length === 1 && key >= 'a' && key <= 'z') return shift ? key.toUpperCase() : key
+  return key
+}
+
+const NAMED_LEGACY_KEY_CODES: Record<string, number> = {
+  Enter: 13,
+  Escape: 27,
+  Tab: 9,
+  Space: 32,
+  ArrowUp: 38,
+  ArrowDown: 40,
+  ArrowLeft: 37,
+  ArrowRight: 39,
+  Home: 36,
+  End: 35,
+  PageUp: 33,
+  PageDown: 34,
+  Backspace: 8,
+  Delete: 46,
+}
+
+/**
+ * Map a bounded key onto the legacy `keyCode`/`which` value. Pages that gate a
+ * gesture on `event.keyCode` — chat composers sending on `keyCode === 13` are
+ * the common case — never react to a synthetic event that omits it, because
+ * the constructor defaults these members to 0.
+ */
+function legacyKeyCode(key: BridgePressKey): number {
+  const named = NAMED_LEGACY_KEY_CODES[key]
+  if (named !== undefined) return named
+  return key.toUpperCase().charCodeAt(0)
+}
+
 /** Dispatch a bubbling, cancelable key sequence against one element. */
 function dispatchKeySequence(
   element: HTMLElement,
   key: BridgePressKey,
   modifiers: { ctrl?: boolean; alt?: boolean; shift?: boolean; meta?: boolean },
 ): boolean {
-  const code = key === 'Space' ? 'Space' : key
-  const eventKey = key === 'Space' ? ' ' : key
+  const code = keyCode(key)
+  const eventKey = eventKeyFor(key, modifiers.shift === true)
+  const legacy = legacyKeyCode(key)
   let prevented = false
   for (const type of ['keydown', 'keypress', 'keyup'] as const) {
-    if (type === 'keypress' && ['Tab', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown', 'Backspace', 'Delete'].includes(key)) {
-      continue
-    }
+    if (type === 'keypress' && SKIP_KEYPRESS.has(key)) continue
     const event = new KeyboardEvent(type, {
       key: eventKey,
       code,
+      keyCode: legacy,
+      which: legacy,
       bubbles: true,
       composed: true,
       cancelable: true,
@@ -416,6 +586,7 @@ function pressKey(
     const prevented = dispatchKeySequence(element, key, modifiers)
     if (prevented) {
       observed = true
+      if (key === 'Enter') submitStandaloneComposer(element)
       continue
     }
     if (applyKeyDefault(element, key, modifiers)) observed = true

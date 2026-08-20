@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-16-semantic-browser-automation.md
-2026-08-16-semantic-browser-automation.md: b41ecbbe7c6154312662022cada4e6bfe4c3aef5
-2026-08-16-semantic-browser-automation.zh.md: 3541c5137da7b25497ba0355c506ca6a568dee03
+2026-08-16-semantic-browser-automation.md: f3c4ef4298e0347a590fc1abc6b9ef3db7f62e71
+2026-08-16-semantic-browser-automation.zh.md: 0bc38f6084ab6ae245e121516e117913519b3485

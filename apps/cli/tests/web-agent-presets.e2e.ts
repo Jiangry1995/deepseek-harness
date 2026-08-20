@@ -30,6 +30,52 @@ const WEB_PATCH = join(REPO_ROOT, 'packages/bundle/web-app/cordis.patch.yml')
 const INSTALL_ANCHOR = join(REPO_ROOT, 'apps/cli/package.json')
 const EXAMPLES_INSTALL_ANCHOR = join(REPO_ROOT, 'examples/package.json')
 const MINIMAL_PROMPT = 'You are a helpful software engineer assistant.'
+/** The shipped `standard` / `code` / `cordis` shell tool; `minimal` still pins `bash`. */
+const SHELL_TOOL = process.platform === 'win32' ? 'pwsh' : 'bash'
+/** Exact `standard` catalog minus ripgrep-backed `glob`/`grep`. */
+const STANDARD_TOOLS = [
+  'ask_user_question',
+  SHELL_TOOL,
+  'browser_activate_tab',
+  'browser_click',
+  'browser_close_tab',
+  'browser_fill',
+  'browser_focus',
+  'browser_inspect',
+  'browser_list_tabs',
+  'browser_open_tab',
+  'browser_press',
+  'browser_read_page',
+  'browser_scroll',
+  'browser_select',
+  'browser_wait_for',
+  'create_goal',
+  'edit',
+  'exit_plan_mode',
+  'get_goal',
+  'interrupt_agent',
+  'job_kill',
+  'job_list',
+  'job_output',
+  'list_agents',
+  'memory_list',
+  'memory_note',
+  'memory_read',
+  'memory_search',
+  'ralph',
+  'read',
+  'read_image',
+  'send_message',
+  'skill',
+  'subagent',
+  'subagent_fork',
+  'todo_write',
+  'update_goal',
+  'web_fetch',
+  'web_search',
+  'workflow',
+  'write',
+].toSorted()
 const MINIMAL_BASH_DESCRIPTION = `Run commands in a bash shell
 * When invoking this tool, the contents of the "command" parameter does NOT need to be XML-escaped.
 * You don't have access to the internet via this tool.
@@ -203,12 +249,7 @@ describe('the shipped Web composition', () => {
       // layer mounts cleanly and simply contributes nothing. `glob`/`grep` are
       // excluded for the reason the TUI composition e2e excludes them — they
       // depend on ripgrep being present on the machine.
-      expect(toolNames(ctx, handle.agent).filter(name => name !== 'glob' && name !== 'grep')).toEqual([
-        'ask_user_question', 'bash', 'create_goal', 'edit', 'exit_plan_mode',
-        'get_goal', 'interrupt_agent', 'job_kill', 'job_list', 'job_output', 'list_agents', 'ralph', 'read', 'read_image', 'send_message', 'skill',
-        'subagent', 'subagent_fork', 'todo_write', 'update_goal', 'web_search',
-        'workflow', 'write',
-      ])
+      expect(toolNames(ctx, handle.agent).filter(name => name !== 'glob' && name !== 'grep')).toEqual(STANDARD_TOOLS)
     } finally {
       await handle.dispose()
     }
@@ -271,7 +312,7 @@ describe('the shipped Web composition', () => {
         'cordis_define', 'cordis_run', 'cordis_stop', 'cordis_undefine',
       ]))
       // And it keeps the standard agent's own tools rather than replacing them.
-      expect(tools).toEqual(expect.arrayContaining(['bash', 'read', 'edit', 'skill']))
+      expect(tools).toEqual(expect.arrayContaining([SHELL_TOOL, 'read', 'edit', 'skill', 'memory_search']))
       expect(tools).not.toContain('str_replace_editor')
 
       // The preset's own authoring skill registers into ITS layer of the host
@@ -303,11 +344,12 @@ describe('the shipped Web composition', () => {
       const sdk = assembly.sections.find(section => section.name === 'tools:sdk')?.text ?? ''
       expect(sdk).not.toContain('str_replace_editor')
       expect(sdk).toContain('web_search')
+      expect(sdk).toContain('memory_search')
 
       // The presentation is this agent's alone: the deployment default is
       // native, and the session composed from `standard` still sees it.
       const nativeAssembly = await ctx.systemPrompt.assemble({ scope: native.agent })
-      expect(nativeAssembly.tools.map(tool => tool.name)).toContain('bash')
+      expect(nativeAssembly.tools.map(tool => tool.name)).toContain(SHELL_TOOL)
       expect(nativeAssembly.tools.map(tool => tool.name)).not.toContain('run_code')
       expect(nativeAssembly.sections.some(section => section.name === 'tools:sdk')).toBe(false)
     } finally {
@@ -609,7 +651,7 @@ describe('a delegated child', () => {
       expect(toolNames(ctx, child.agent)).toEqual(toolNames(ctx, parent.agent))
       // The shipped `standard` preset is the whole coding agent; an empty
       // child here is the defect, and equality alone would not catch it.
-      expect(toolNames(ctx, child.agent)).toContain('bash')
+      expect(toolNames(ctx, child.agent)).toContain(SHELL_TOOL)
       expect(child.agent.session.header.agentPreset).toBe('standard')
     } finally {
       await child.dispose()
@@ -749,8 +791,11 @@ describe('authoring a preset on the shipped composition', () => {
     expect(preset.description).toBe(source.description)
     expect(await authorCtx.agentPresets.read('my-agent')).toBe(await authorCtx.agentPresets.read('minimal'))
     // Owner-only, in an owner-only directory: a composition is executable
-    // configuration on a machine that may have other users.
-    expect((await stat(preset.path)).mode & 0o777).toBe(0o600)
+    // configuration on a machine that may have other users. Windows does not
+    // honor POSIX permission bits.
+    if (process.platform !== 'win32') {
+      expect((await stat(preset.path)).mode & 0o777).toBe(0o600)
+    }
     const handle = await authorCtx.agents.create({
       sessionId: SessionId('preset-authored'),
       setup: agentCtx => authorCtx.agentPresets.mount(agentCtx, 'my-agent').then(() => undefined),

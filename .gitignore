@@ -38,3 +38,12 @@ apps/web/dist/
 worktrees/
 .agents/worktrees/
 .typert-*/
+DesktopApp/node_modules/
+DesktopApp/dist/
+DesktopApp/.runtime/
+DesktopApp/release/
+.tmp/
+.playwright-cli/
+.dsh/
+output/playwright/
+packages/client/browser-extension/windows/out/

@@ -81,6 +81,7 @@ const GROUP_ORDER = [
   'web',
   'spill',
   'todo',
+  'memory',
   'plan',
   'cordis',
   'hooks',
@@ -111,7 +112,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'LLM adapter registry',
     mode: 'seam',
     implementations: ['llm-deepseek', 'llm-pi-ai', 'llm-replay'],
-    consumers: ['agent-loop', 'compaction-basic'],
+    consumers: ['agent-loop', 'compaction-basic', 'tool-memory'],
     note: 'Adapters register provider implementations; the loop and compaction call the provider-neutral stream service.',
   },
   {
@@ -258,7 +259,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     pkg: 'system-prompt',
     title: 'System prompt assembly registry',
     mode: 'core',
-    consumers: ['agent-loop', 'tools', 'tool-fs', 'tool-terminal', 'tool-web'],
+    consumers: ['agent-loop', 'tools', 'tool-fs', 'tool-terminal', 'tool-web', 'tool-memory'],
     note: 'Collects prompt sections and model-facing tool schemas for each step.',
   },
   {
@@ -266,7 +267,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     pkg: 'tools',
     title: 'Tool registry and guarded execution pipeline',
     mode: 'core',
-    consumers: ['agent-loop', 'tool-ask-user', 'tool-bash', 'tool-cordis', 'tool-fs', 'tool-terminal', 'tool-skill', 'tool-subagent', 'tool-todo', 'tool-web'],
+    consumers: ['agent-loop', 'tool-ask-user', 'tool-bash', 'tool-cordis', 'tool-fs', 'tool-terminal', 'tool-skill', 'tool-subagent', 'tool-todo', 'tool-memory', 'tool-web'],
     note: 'Registers capabilities, owns Code Mode transport, and routes calls through pre-policy, monotonic guards, around dispatch, post-policy, and final-result observation.',
   },
   {
@@ -511,6 +512,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     implementations: ['spill-local'],
     consumers: ['spill-policy'],
     note: 'The backend saves oversized tool text and returns a model-facing locator plus retrieval hint; spill-policy is the tools/post-execute consumer that decides when to spill.',
+  },
+  {
+    key: 'memory',
+    pkg: 'memory',
+    title: 'Local markdown memory store',
+    mode: 'core',
+    consumers: ['tool-memory'],
+    note: 'Owns user-level and project-level markdown files, path containment, and per-session watermarks; tool-memory injects summaries and runs extract/consolidate.',
   },
   {
     key: 'directoryPicker',

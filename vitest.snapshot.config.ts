@@ -16,10 +16,13 @@ function positiveIntFromEnv(name: string, fallback: number): number {
   return value
 }
 
+const snapshotMode = process.env.DSH_SNAPSHOT || 'replay'
 const snapshotMaxConcurrency = positiveIntFromEnv(
   'DSH_SNAPSHOT_MAX_CONCURRENCY',
   Math.min(DEFAULT_SNAPSHOT_MAX_CONCURRENCY, availableParallelism()),
 )
+/** Refresh/record write shared sidecars; in-file scenario concurrency would clobber them. */
+const writeBackConcurrency = snapshotMode === 'replay' ? snapshotMaxConcurrency : 1
 
 // Replay is the keyless default: boot real subprocess paths from recorded model responses and diff
 // assembled requests, normalized protocol or transcript output, and persisted-log expected outputs.
@@ -57,12 +60,12 @@ export default defineConfig({
     // fixture set per scenario), so replay runs the snapshot files in
     // parallel and bounds in-file concurrency with the environment knob
     // (value 1 restores fully serial replay on constrained machines). Record
-    // and refresh stay serial: record spends real API quota per scenario, and
-    // refresh write-back harvests volatile values from fixtures already on
-    // disk, so concurrent writers would corrupt goldens.
+    // and refresh stay serial across files AND inside a file: record spends
+    // real API quota per scenario, and refresh write-back harvests shared
+    // prompt/schema sidecars, so concurrent writers would corrupt goldens.
     testTimeout: 120_000,
     hookTimeout: 30_000,
-    fileParallelism: (process.env.DSH_SNAPSHOT || 'replay') === 'replay' && snapshotMaxConcurrency > 1,
-    maxConcurrency: snapshotMaxConcurrency,
+    fileParallelism: snapshotMode === 'replay' && snapshotMaxConcurrency > 1,
+    maxConcurrency: writeBackConcurrency,
   },
 })

@@ -20,14 +20,36 @@ function errorMessage(error: unknown): string {
 }
 
 /**
+ * Extra Host milliseconds after a wait-page in-page timeout.
+ * Keep aligned with `WAIT_PAGE_HOST_HEADROOM_MS` in `@deepseek-ai/dsh-browser`.
+ */
+const WAIT_PAGE_HOST_HEADROOM_MS = 1_500
+/** Slack so the page bridge finishes before the Host request timer. */
+const PROVIDER_REQUEST_SLACK_MS = 1_000
+
+/**
+ * Host retention for one provider operation, matching `dsh-browser`.
+ * @param leaseTimeoutMs - Host-advertised request timeout.
+ * @param operation - command dispatched to the page bridge.
+ * @returns milliseconds the Host retains the pending request.
+ */
+function hostOperationTimeoutMs(
+  leaseTimeoutMs: number,
+  operation: BrowserCommand['operation'],
+): number {
+  if (operation.kind !== 'wait-page') return leaseTimeoutMs
+  return Math.max(leaseTimeoutMs, operation.timeoutMs + WAIT_PAGE_HOST_HEADROOM_MS)
+}
+
+/**
  * Finish the page-bridge wait before the Host request timer so a concrete extension
  * failure is completed instead of racing into `BROWSER_REQUEST_TIMEOUT`.
- * @param leaseTimeoutMs - Host-advertised request timeout.
+ * @param hostTimeoutMs - Host retention for this operation.
  * @returns timeout used by the page-side bridge.
  */
-function providerRequestTimeoutMs(leaseTimeoutMs: number): number {
-  const slackMs = Math.min(1_000, Math.max(0, leaseTimeoutMs - 1))
-  return Math.max(1, leaseTimeoutMs - slackMs)
+function providerRequestTimeoutMs(hostTimeoutMs: number): number {
+  const slackMs = Math.min(PROVIDER_REQUEST_SLACK_MS, Math.max(0, hostTimeoutMs - 1))
+  return Math.max(1, hostTimeoutMs - slackMs)
 }
 
 /**
@@ -176,7 +198,7 @@ class BrowserExtensionProvider {
       response = hostCompletionResponse(await this.bridge.request(
         command.requestId,
         command.operation,
-        providerRequestTimeoutMs(currentLease.requestTimeoutMs),
+        providerRequestTimeoutMs(hostOperationTimeoutMs(currentLease.requestTimeoutMs, command.operation)),
       ))
     } catch (error) {
       response = { ok: false, error: { code: 'BROWSER_API_FAILED', message: errorMessage(error) } }

@@ -1,10 +1,13 @@
 /** Chromium API adapter for validated browser-extension bridge operations. */
 
 import {
+  BROWSER_INSPECT_RESULT_MAX_BYTES,
   BROWSER_PAGE_RESULT_MAX_BYTES,
   isBridgePageActionReceipt,
   isBridgePage,
   isBridgePageContent,
+  isBridgePageInspect,
+  isBridgePageInspectContent,
   isBridgeError,
   isBridgeRequest,
   isBridgeScrollReceipt,
@@ -17,7 +20,7 @@ import {
   type EnsureWebRequest,
 } from './companion-protocol.ts'
 import { normalizeHarnessOrigin } from './local-origin.ts'
-import { DSH_ACT_PAGE_KIND, DSH_READ_PAGE_KIND, DSH_WAIT_PAGE_KIND } from './page-content-runtime.ts'
+import { DSH_ACT_PAGE_KIND, DSH_INSPECT_PAGE_KIND, DSH_READ_PAGE_KIND, DSH_WAIT_PAGE_KIND } from './page-content-runtime.ts'
 import type {
   BridgeError,
   BridgeOperation,
@@ -26,6 +29,8 @@ import type {
   BridgePageActionReceipt,
   BridgePage,
   BridgePageContent,
+  BridgePageInspect,
+  BridgePageInspectContent,
   BridgeRequest,
   BridgeResponse,
   BridgeScrollReceipt,
@@ -166,6 +171,38 @@ function boundedPage(tab: BridgeTab, content: BridgePageContent): BridgePage {
   return page
 }
 
+/** Return the serialized UTF-8 byte count of one complete inspect result. */
+function inspectByteLength(inspect: BridgePageInspect): number {
+  return new TextEncoder().encode(JSON.stringify(inspect)).byteLength
+}
+
+/** Trim inspect buffers until the complete result fits the inspect byte budget. */
+function boundedInspect(tab: BridgeTab, content: BridgePageInspectContent): BridgePageInspect {
+  const inspect: BridgePageInspect = {
+    tab,
+    hooked: content.hooked,
+    ...(content.hookedAt === undefined ? {} : { hookedAt: content.hookedAt }),
+    network: [...content.network],
+    console: [...content.console],
+    omittedNetwork: content.omittedNetwork,
+    omittedConsole: content.omittedConsole,
+  }
+  while ((inspect.network.length > 0 || inspect.console.length > 0)
+    && inspectByteLength(inspect) > BROWSER_INSPECT_RESULT_MAX_BYTES) {
+    if (inspect.network.length > 0) {
+      inspect.network.shift()
+      inspect.omittedNetwork += 1
+    } else {
+      inspect.console.shift()
+      inspect.omittedConsole += 1
+    }
+  }
+  if (!isBridgePageInspect(inspect)) {
+    throw new Error('browser extension: inspect result exceeds the inspect result limit')
+  }
+  return inspect
+}
+
 /** Return whether Chromium's script failure reports missing authority for the target page. */
 function isPageAccessFailure(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error)
@@ -235,6 +272,8 @@ const PAGE_INJECT_TIMEOUT_MS = 5_000
 
 /** Reader bundle injected into tabs that loaded before this extension generation. */
 const PAGE_READER_FILE = 'page-content.js'
+/** MAIN-world probe injected so fetch/XHR/console can be observed. */
+const PAGE_PROBE_FILE = 'page-probe.js'
 
 /** Tab shown in the side-panel header; read-page prefers this over the Service Worker's window guess. */
 let focusedTabId: number | undefined
@@ -306,7 +345,20 @@ function askPageScript(tabs: TabsApi, tabId: number, message: unknown, timeoutMs
 }
 
 /** Inject the current page-content generation into one existing tab. */
-function injectPageScript(scripting: ScriptingApi, tabId: number): Promise<unknown> {
+async function injectPageScript(scripting: ScriptingApi, tabId: number): Promise<unknown> {
+  try {
+    await withTimeout(
+      scripting.executeScript({
+        target: { tabId },
+        files: [PAGE_PROBE_FILE],
+        world: 'MAIN',
+      }),
+      PAGE_INJECT_TIMEOUT_MS,
+      'browser extension: page probe injection did not return before timeout',
+    )
+  } catch {
+    // Page CSP can block MAIN-world scripts. Inspect then reports hooked:false.
+  }
   return withTimeout(
     scripting.executeScript({ target: { tabId }, files: [PAGE_READER_FILE] }),
     PAGE_INJECT_TIMEOUT_MS,
@@ -323,6 +375,12 @@ function isCurrentReadResponse(value: unknown): boolean {
 /** Return whether one page-script answer is a current action response or classified failure. */
 function isCurrentActionResponse(value: unknown): boolean {
   return isPageReaderFailure(value) || isPageActorSuccess(value)
+}
+
+/** Return whether one page-script answer is a current inspect response or classified failure. */
+function isCurrentInspectResponse(value: unknown): boolean {
+  return isPageReaderFailure(value)
+    || (isPageReaderSuccess(value) && isBridgePageInspectContent(value.content))
 }
 
 /**
@@ -389,6 +447,46 @@ async function readActivePage(tabs: TabsApi, scripting: ScriptingApi, tabId?: nu
   return readTabPage(tabs, scripting, await resolveReadTab(tabs, tabId))
 }
 
+/** Inspect Network/Console observations from one resolved tab. */
+async function inspectTabPage(
+  tabs: TabsApi,
+  scripting: ScriptingApi,
+  tab: chrome.tabs.Tab,
+  reset: boolean,
+): Promise<BridgePageInspect> {
+  const normalized = normalizeTab(tab)
+  let response: unknown
+  try {
+    response = await requestPageScript(
+      tabs,
+      scripting,
+      normalized.id,
+      { kind: DSH_INSPECT_PAGE_KIND, reset },
+      isCurrentInspectResponse,
+    )
+  } catch (error) {
+    if (!isPageAccessFailure(error) && !isMissingPageReader(error)) throw error
+    throw new PageAccessDeniedError(
+      'browser extension: this page cannot be inspected by extensions; open a normal http(s) page, then retry',
+    )
+  }
+  if (isPageReaderFailure(response)) throw new ClassifiedBridgeError(response.error.code, response.error.message)
+  if (!isPageReaderSuccess(response) || !isBridgePageInspectContent(response.content)) {
+    throw new Error('browser extension: page script returned an invalid inspect result')
+  }
+  return boundedInspect(normalized, response.content)
+}
+
+/** Inspect the requested tab, or the tab shown in the side panel. */
+async function inspectActivePage(
+  tabs: TabsApi,
+  scripting: ScriptingApi,
+  tabId: number | undefined,
+  reset: boolean,
+): Promise<BridgePageInspect> {
+  return inspectTabPage(tabs, scripting, await resolveReadTab(tabs, tabId), reset)
+}
+
 /** Execute one document-bound action in the tab shown by the side panel. */
 async function actOnActivePage(
   tabs: TabsApi,
@@ -414,6 +512,7 @@ async function actOnActivePage(
   }
   if (isPageReaderFailure(response)) throw new ClassifiedBridgeError(response.error.code, response.error.message)
   if (!isPageActorSuccess(response)) throw new Error('browser extension: page script returned an invalid action result')
+  rememberPageTab(operation.pageId, tab.id)
   return response.receipt
 }
 
@@ -497,6 +596,11 @@ export async function executeBridgeOperation(
     }
     case 'read-page':
       return { kind: 'read-page', page: await readActivePage(tabs, scripting, operation.tabId) }
+    case 'inspect-page':
+      return {
+        kind: 'inspect-page',
+        inspect: await inspectActivePage(tabs, scripting, operation.tabId, operation.reset),
+      }
     case 'click-page-element':
     case 'fill-page-element':
     case 'select-page-option':
@@ -518,17 +622,13 @@ export async function executeBridgeOperation(
     case 'wait-page':
     {
       const mappedTabId = operation.pageId === undefined ? undefined : pageTabIds.get(operation.pageId)
-      if (operation.pageId !== undefined && mappedTabId === undefined && operation.tabId === undefined) {
-        throw new ClassifiedBridgeError('BROWSER_PAGE_STALE', 'browser extension: page snapshot is no longer available; read the page again')
-      }
       if (mappedTabId !== undefined && operation.tabId !== undefined && mappedTabId !== operation.tabId) {
         throw new ClassifiedBridgeError('BROWSER_PAGE_STALE', 'browser extension: page snapshot belongs to another tab; read the page again')
       }
-      const waitTabId = mappedTabId ?? operation.tabId
-      if (waitTabId === undefined) throw new InvalidBridgeRequestError('browser extension: wait-page requires pageId or tabId')
+      const tab = normalizeTab(await resolveReadTab(tabs, mappedTabId ?? operation.tabId))
       return {
         kind: 'wait-page',
-        page: await waitForTabPage(tabs, scripting, waitTabId, {
+        page: await waitForTabPage(tabs, scripting, tab.id, {
           condition: operation.condition,
           timeoutMs: operation.timeoutMs,
           stableMs: operation.stableMs,

@@ -1,0 +1,99 @@
+{
+  "name": "deepseek-harness-desktop",
+  "version": "0.1.0",
+  "description": "DeepSeek Harness 的独立 Electron 桌面壳",
+  "author": "沭河",
+  "private": true,
+  "type": "module",
+  "main": "dist/src/main.js",
+  "packageManager": "pnpm@11.7.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "generate:icon": "electron scripts/generate-icon.mjs",
+    "test": "pnpm run build && node --test dist/tests/*.test.js",
+    "start": "pnpm run build && electron .",
+    "stage:runtime": "node scripts/stage-runtime.mjs",
+    "smoke:runtime": "pnpm run build && node scripts/smoke-runtime.mjs",
+    "smoke:unpacked": "node scripts/smoke-unpacked.mjs",
+    "sync:companion-uninstall": "node scripts/sync-companion-uninstall.mjs",
+    "pack:extension": "node scripts/pack-extension.mjs",
+    "dist:win": "pnpm run test && pnpm run stage:runtime && pnpm run smoke:runtime && pnpm run sync:companion-uninstall && pnpm run generate:icon && electron-builder --win zip --x64 && pnpm run smoke:unpacked && pnpm run pack:extension"
+  },
+  "desktopRuntime": {
+    "harnessVersion": "0.1.0-rc.5",
+    "nodeVersion": "24.18.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "electron": "43.2.0",
+    "electron-builder": "26.15.3",
+    "typescript": "6.0.3"
+  },
+  "build": {
+    "appId": "ai.deepseek.harness.desktop",
+    "productName": "DeepSeek Harness",
+    "copyright": "沭河",
+    "asar": true,
+    "artifactName": "DeepSeek-Harness-${version}-win-x64.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/src/**",
+      "resources/**",
+      "package.json"
+    ],
+    "extraFiles": [
+      {
+        "from": "resources/portable-readme.txt",
+        "to": "使用说明.txt"
+      },
+      {
+        "from": "resources/uninstall-portable.ps1",
+        "to": "uninstall.ps1"
+      },
+      {
+        "from": "resources/uninstall-portable.cmd",
+        "to": "uninstall.cmd"
+      }
+    ],
+    "extraResources": [
+      {
+        "from": ".runtime/node",
+        "to": "runtime/node"
+      },
+      {
+        "from": ".runtime/app",
+        "to": "runtime/app",
+        "filter": [
+          "package.json"
+        ]
+      },
+      {
+        "from": ".runtime/app/node_modules",
+        "to": "runtime/app/node_modules",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "resources/uninstall-companion.ps1",
+        "to": "uninstall-companion.ps1"
+      }
+    ],
+    "win": {
+      "icon": "resources/icon.ico",
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    }
+  }
+}

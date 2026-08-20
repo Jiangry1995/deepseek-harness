@@ -14,6 +14,19 @@ const background: UserConfig = {
   outputOptions: { entryFileNames: 'background.js' },
 }
 
+const pageProbe: UserConfig = {
+  name: '@deepseek-ai/dsh-client-browser-extension/page-probe',
+  entry: { 'page-probe': 'lib/types/extension/page-probe.js' },
+  outDir: 'extension',
+  format: ['iife'],
+  platform: 'browser',
+  target: 'es2022',
+  dts: false,
+  clean: false,
+  noExternal: true,
+  outputOptions: { entryFileNames: 'page-probe.js' },
+}
+
 const pageContent: UserConfig = {
   name: '@deepseek-ai/dsh-client-browser-extension/page-content',
   entry: { 'page-content': 'lib/types/extension/page-content.js' },
@@ -56,5 +69,5 @@ const sidepanel: UserConfig = {
 export default clientBundle(
   '@deepseek-ai/dsh-client-browser-extension',
   ['lib/types/index.js', 'lib/types/invariant.js'],
-  { companions: [background, content, pageContent, sidepanel] },
+  { companions: [background, content, pageProbe, pageContent, sidepanel] },
 )

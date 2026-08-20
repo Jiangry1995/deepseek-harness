@@ -104,6 +104,15 @@ export interface BrowserPageAction {
   role: string
   /** Visible or accessible label. */
   label: string
+  /** Placement of an unlabeled or compact control, so siblings remain distinguishable. */
+  rect?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  /** Whether the control uses a saturated non-gray fill. */
+  accent?: boolean
   /** Whether the element currently rejects activation. */
   disabled: boolean
   /** Whether the element intersects the current viewport. */
@@ -180,11 +189,74 @@ export interface BrowserReadPageRequest {
   tabId?: number
 }
 
+/** Caller request for inspecting recent page network and console observations. */
+export interface BrowserInspectPageRequest {
+  /** Browser-assigned tab identity; omitted to inspect the current active web tab. */
+  tabId?: number
+  /** Whether to clear the in-page buffers after this snapshot. Defaults to false. */
+  reset?: boolean
+}
+
+/** Fully resolved inspect operation sent to the extension provider. */
+export interface BrowserInspectPageSpec {
+  kind: 'inspect-page'
+  tabId?: number
+  reset: boolean
+}
+
+/** One observed page network call captured after the in-page probe was installed. */
+export interface BrowserNetworkEntry {
+  /** Epoch milliseconds when the request finished or failed. */
+  at: number
+  /** Browser API that produced the observation. */
+  source: 'fetch' | 'xhr'
+  /** HTTP method. */
+  method: string
+  /** Sanitized request URL without credentials or secret query values. */
+  url: string
+  /** HTTP status when the call completed. */
+  status?: number
+  /** Whether the HTTP status was in the 2xx range. */
+  ok?: boolean
+  /** Elapsed milliseconds from send to completion. */
+  durationMs?: number
+  /** Failure text when the call did not complete with a response. */
+  error?: string
+}
+
+/** One observed page console or error event. */
+export interface BrowserConsoleEntry {
+  /** Epoch milliseconds when the message was recorded. */
+  at: number
+  /** Console severity. */
+  level: 'log' | 'info' | 'warn' | 'error' | 'debug'
+  /** Bounded rendered message text. */
+  text: string
+}
+
+/** Bounded Network/Console snapshot of one browser page. */
+export interface BrowserPageInspect {
+  /** Tab from which the snapshot was taken. */
+  tab: BrowserTab
+  /** Whether the MAIN-world fetch/XHR/console probe answered this inspect. */
+  hooked: boolean
+  /** Epoch milliseconds when the probe was first installed in this document. */
+  hookedAt?: number
+  /** Recent page network calls. */
+  network: BrowserNetworkEntry[]
+  /** Recent page console messages. */
+  console: BrowserConsoleEntry[]
+  /** Network entries dropped because the ring buffer was full. */
+  omittedNetwork: number
+  /** Console entries dropped because the ring buffer was full. */
+  omittedConsole: number
+}
+
 /** Caller request for filling one current page field. */
 export interface BrowserFillPageRequest extends BrowserPageTarget {
   /** Complete replacement text. */
   value: string
-  /** Whether to submit the owning form or dispatch Enter after filling. */
+  /** Whether to submit the owning form, click a nearby send control, or dispatch Enter after filling. */
   submit?: boolean
 }
 
@@ -253,22 +325,27 @@ export interface BrowserScrollReceipt {
   atBoundary: boolean
 }
 
+/** Named keys accepted without a shortcut modifier. */
+export const NAMED_PRESS_KEYS = [
+  'Enter', 'Escape', 'Tab', 'Space',
+  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+  'Home', 'End', 'PageUp', 'PageDown', 'Backspace', 'Delete',
+] as const
+
+/** Letter keys accepted only with Control, Alt, or Meta. */
+export const LETTER_PRESS_KEYS = [
+  'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+  'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+] as const
+
+/** Digit keys accepted only with Control, Alt, or Meta. */
+export const DIGIT_PRESS_KEYS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'] as const
+
+/** Complete bounded keyboard allowlist. */
+export const PRESS_KEY_VALUES = [...NAMED_PRESS_KEYS, ...LETTER_PRESS_KEYS, ...DIGIT_PRESS_KEYS] as const
+
 /** Keys accepted by the bounded keyboard operation. */
-export type BrowserPressKey =
-  | 'Enter'
-  | 'Escape'
-  | 'Tab'
-  | 'Space'
-  | 'ArrowUp'
-  | 'ArrowDown'
-  | 'ArrowLeft'
-  | 'ArrowRight'
-  | 'Home'
-  | 'End'
-  | 'PageUp'
-  | 'PageDown'
-  | 'Backspace'
-  | 'Delete'
+export type BrowserPressKey = (typeof PRESS_KEY_VALUES)[number]
 
 /** Optional keyboard modifiers for one bounded key press. */
 export interface BrowserPressModifiers {
@@ -384,6 +461,7 @@ export type BrowserOperation =
   | BrowserOpenTabSpec
   | { kind: 'list-tabs' }
   | ({ kind: 'read-page' } & BrowserReadPageRequest)
+  | BrowserInspectPageSpec
   | ({ kind: 'click-page-element' } & BrowserPageTarget)
   | BrowserFillPageSpec
   | ({ kind: 'select-page-option' } & BrowserSelectPageRequest)
@@ -399,6 +477,7 @@ export type BrowserOperationResult =
   | { kind: 'open-tab'; tab: BrowserTab }
   | { kind: 'list-tabs'; tabs: BrowserTab[] }
   | { kind: 'read-page'; page: BrowserPage }
+  | { kind: 'inspect-page'; inspect: BrowserPageInspect }
   | { kind: 'click-page-element'; receipt: BrowserPageActionReceipt }
   | { kind: 'fill-page-element'; receipt: BrowserPageActionReceipt }
   | { kind: 'select-page-option'; receipt: BrowserPageActionReceipt }

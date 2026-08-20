@@ -8,6 +8,7 @@ import BrowserService, {
   type BrowserCommand,
   type BrowserPage,
   type BrowserTab,
+  type BrowserWaitCondition,
 } from '../src/index.ts'
 
 const signal = new AbortController().signal
@@ -234,6 +235,38 @@ describe('BrowserService operation lifecycle', () => {
       .rejects.toMatchObject({ code: 'BROWSER_INVALID_TAB_ID' })
   })
 
+  it('routes inspect-page and returns the matching Network/Console snapshot', async () => {
+    const { ctx, commands } = await harness()
+    const lease = ctx.browser.connect('inspect-client', true)
+    const pending = ctx.browser.inspectPage({ tabId: 12, reset: true }, signal)
+    expect(commands[0]?.operation).toEqual({ kind: 'inspect-page', tabId: 12, reset: true })
+    ctx.browser.complete({
+      requestId: commands[0]!.requestId,
+      clientId: lease.clientId,
+      response: {
+        ok: true,
+        value: {
+          kind: 'inspect-page',
+          inspect: {
+            tab: tab(12, true),
+            hooked: true,
+            hookedAt: 1,
+            network: [{
+              at: 2, source: 'fetch', method: 'POST', url: 'https://example.test/save', status: 200, ok: true, durationMs: 9,
+            }],
+            console: [],
+            omittedNetwork: 0,
+            omittedConsole: 0,
+          },
+        },
+      },
+    })
+    await expect(pending).resolves.toMatchObject({
+      hooked: true,
+      network: [{ method: 'POST', url: 'https://example.test/save', status: 200 }],
+    })
+  })
+
   it('routes document-bound click, fill, and select operations with resolved defaults', async () => {
     const { ctx, commands } = await harness()
     const lease = ctx.browser.connect('page-actor', true)
@@ -370,6 +403,28 @@ describe('BrowserService operation lifecycle', () => {
     })).toThrow(expect.objectContaining({ code: 'BROWSER_INVALID_REQUEST' }))
   })
 
+  it('treats an incomplete change wait as ready and still rejects an invalid complete change', async () => {
+    const { ctx } = await harness()
+    expect(ctx.browser.resolveWaitPage({
+      kind: 'wait-page',
+      pageId,
+      condition: { kind: 'change' } as BrowserWaitCondition,
+      timeoutMs: 400,
+    })).toEqual({
+      kind: 'wait-page',
+      pageId,
+      condition: { kind: 'ready' },
+      timeoutMs: 400,
+      stableMs: 150,
+    })
+    expect(() => ctx.browser.resolveWaitPage({
+      kind: 'wait-page',
+      pageId,
+      condition: { kind: 'change', documentId: 'not-a-uuid' as typeof documentId, afterRevision: 1 },
+      timeoutMs: 400,
+    })).toThrow(expect.objectContaining({ code: 'BROWSER_INVALID_REQUEST' }))
+  })
+
   it('validates browser client and tab identifiers at their public boundaries', async () => {
     const { ctx } = await harness()
     expect(() => ctx.browser.connect('bad client', true))
@@ -443,6 +498,28 @@ describe('BrowserService operation lifecycle', () => {
     const timedOutResult = expect(timedOut).rejects.toMatchObject({ code: 'BROWSER_REQUEST_TIMEOUT' })
     await vi.advanceTimersByTimeAsync(51)
     await timedOutResult
+  })
+
+  it('retains wait-page past requestTimeoutMs until timeoutMs plus host headroom', async () => {
+    vi.useFakeTimers()
+    const { ctx } = await harness({ requestTimeoutMs: 200 })
+    ctx.browser.connect('wait-timer-client', true)
+
+    const pending = ctx.browser.waitPage({
+      kind: 'wait-page',
+      pageId,
+      condition: { kind: 'text', text: 'never', state: 'present' },
+      timeoutMs: 400,
+    }, signal)
+    let settled = false
+    void pending.then(() => { settled = true }, () => { settled = true })
+
+    await vi.advanceTimersByTimeAsync(201)
+    expect(settled).toBe(false)
+
+    const timedOut = expect(pending).rejects.toMatchObject({ code: 'BROWSER_REQUEST_TIMEOUT' })
+    await vi.advanceTimersByTimeAsync(1_699)
+    await timedOut
   })
 
   it('settles pending work when the service fiber is disposed', async () => {

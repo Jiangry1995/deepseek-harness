@@ -58,6 +58,15 @@ function page(overrides: Partial<BrowserPage> = {}): BrowserPage {
       focused: false,
       href: '/search',
       expanded: true,
+    }, {
+      ref: BrowserPageElementRef('e4'),
+      role: 'button',
+      label: '发送',
+      rect: { x: 1184, y: 812, width: 32, height: 32 },
+      accent: true,
+      disabled: false,
+      inViewport: true,
+      focused: false,
     }],
     scrollTargets: [{
       ref: BrowserPageElementRef('e3'),
@@ -114,6 +123,26 @@ function resultFor(operation: BrowserOperation): BrowserOperationResult {
       receipt: { pageId: operation.pageId, ref: operation.ref, action: 'pressed', key: operation.key },
     }
     case 'wait-page': return { kind: 'wait-page', page: page({ revision: 4, text: 'Updated details' }) }
+    case 'inspect-page': return {
+      kind: 'inspect-page',
+      inspect: {
+        tab: tab(10, true),
+        hooked: true,
+        hookedAt: 1_700_000_000_000,
+        network: [{
+          at: 1_700_000_000_100,
+          source: 'fetch',
+          method: 'GET',
+          url: 'https://example.test/api',
+          status: 200,
+          ok: true,
+          durationMs: 18,
+        }],
+        console: [{ at: 1_700_000_000_200, level: 'error', text: 'submit failed' }],
+        omittedNetwork: 0,
+        omittedConsole: 0,
+      },
+    }
     case 'activate-tab': return { kind: 'activate-tab', tab: tab(operation.tabId, true) }
     case 'close-tab': return { kind: 'close-tab', tabId: operation.tabId, closed: true }
   }
@@ -155,6 +184,7 @@ describe('tool-browser registration and presentation', () => {
       'browser_close_tab',
       'browser_fill',
       'browser_focus',
+      'browser_inspect',
       'browser_list_tabs',
       'browser_open_tab',
       'browser_press',
@@ -170,6 +200,8 @@ describe('tool-browser registration and presentation', () => {
       .toEqual({ card: 'generic', title: 'List browser tabs', kind: 'read' })
     expect(ctx.tools.get('browser_read_page')?.presentCall?.({}))
       .toEqual({ card: 'generic', title: 'Read current page', kind: 'read' })
+    expect(ctx.tools.get('browser_inspect')?.presentCall?.({}))
+      .toEqual({ card: 'generic', title: 'Inspect page network and console', kind: 'read' })
     expect(ctx.tools.get('browser_fill')?.presentCall?.({ pageId, ref: 'e1', value: 'deepseek' }))
       .toEqual({ card: 'generic', title: 'Fill page field e1', kind: 'other' })
     expect(ctx.tools.get('browser_activate_tab')?.presentCall?.({ tabId: 7 }))
@@ -217,8 +249,13 @@ describe('tool-browser registration and presentation', () => {
     expect(text).toContain('never list, summarize, or mention unrelated tabs')
     expect(text).toContain('HTTP(S) pages are readable and operable by default')
     expect(text).toContain('first use browser_list_tabs or browser_read_page')
+    expect(text).toContain('Native Chromium DevTools cannot be opened')
+    expect(text).toContain('use browser_inspect')
+    expect(text).toContain('it cannot operate browser chrome such as F12')
     expect(text).toContain('Do not call a skill, web search, or a fetch of the Harness page first')
     expect(text).toContain('Recommended loop: read the page, act with a returned ref, wait for the page to change, read again, and verify the actual result')
+    expect(text).toContain('otherwise click the send control from the latest snapshot')
+    expect(text).toContain('Do not invent documentId or afterRevision for kind:change')
     expect(text).toContain('do not silently switch to a skill')
     expect(text).not.toContain('百度')
     expect(text).not.toContain('政务系统')
@@ -231,6 +268,7 @@ describe('tool-browser registration and presentation', () => {
       'browser_open_tab',
       'browser_list_tabs',
       'browser_read_page',
+      'browser_inspect',
       'browser_click',
       'browser_fill',
       'browser_select',
@@ -279,11 +317,20 @@ describe('tool-browser execution and policy', () => {
     expect(read.content[0].text).toContain('options: 热门=top; 最新=live [selected]')
     expect(read.content[0].text).toContain('href=/search')
     expect(read.content[0].text).toContain('expanded')
+    expect(read.content[0].text).toContain('at 1184,812 32x32')
+    expect(read.content[0].text).toContain('[accent]')
     expect(read.content[0].text).toContain('Scroll targets:')
 
     const specified = await call('browser_read_page', { tabId: 11 })
     expect(commands.at(-1)?.operation).toEqual({ kind: 'read-page', tabId: 11 })
     expect(specified).toMatchObject({ isError: false })
+
+    const inspected = await call('browser_inspect', { tabId: 11, reset: true })
+    expect(commands.at(-1)?.operation).toEqual({ kind: 'inspect-page', tabId: 11, reset: true })
+    expect(inspected).toMatchObject({ isError: false, value: { hooked: true } })
+    if (inspected.content[0]?.type !== 'text') throw new Error('browser_inspect did not return text content')
+    expect(inspected.content[0].text).toContain('GET https://example.test/api -> 200')
+    expect(inspected.content[0].text).toContain('error: submit failed')
 
     const clicked = await call('browser_click', { pageId, ref: 'e2' })
     expect(clicked).toMatchObject({ isError: false, value: { pageId, ref: 'e2', action: 'clicked' } })

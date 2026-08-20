@@ -15,6 +15,7 @@ import {
   BrowserPageId as brandBrowserPageId,
   BrowserRequestId as brandBrowserRequestId,
 } from './ids.ts'
+import { NAMED_PRESS_KEYS, PRESS_KEY_VALUES } from './types.ts'
 import type {
   BrowserClientId,
   BrowserClientLease,
@@ -28,8 +29,11 @@ import type {
   BrowserOperationResult,
   BrowserFillPageRequest,
   BrowserFillPageSpec,
+  BrowserInspectPageRequest,
+  BrowserInspectPageSpec,
   BrowserPage,
   BrowserPageActionReceipt,
+  BrowserPageInspect,
   BrowserPageTarget,
   BrowserPressKey,
   BrowserPressPageRequest,
@@ -107,6 +111,24 @@ interface ResolvedConfig {
   clientLeaseMs: number
 }
 
+/**
+ * Extra Host milliseconds after a wait-page in-page timeout.
+ * Keep aligned with `WAIT_PAGE_HOST_HEADROOM_MS` in `@deepseek-ai/dsh-client-browser-extension`.
+ */
+const WAIT_PAGE_HOST_HEADROOM_MS = 1_500
+
+/**
+ * Host retention for one provider operation.
+ * wait-page outlasts the in-page wait and the Client page-bridge slack.
+ * @param requestTimeoutMs - configured Host timeout for ordinary operations.
+ * @param operation - dispatched provider operation.
+ * @returns milliseconds the Host retains the pending request.
+ */
+function hostOperationTimeoutMs(requestTimeoutMs: number, operation: BrowserOperation): number {
+  if (operation.kind !== 'wait-page') return requestTimeoutMs
+  return Math.max(requestTimeoutMs, operation.timeoutMs + WAIT_PAGE_HOST_HEADROOM_MS)
+}
+
 interface RegisteredClient {
   readonly id: BrowserClientId
   lastSeenAt: number
@@ -131,11 +153,8 @@ const SCROLL_MOVEMENTS = new Set<BrowserScrollMovement>([
   'page-up', 'page-down', 'page-left', 'page-right',
   'top', 'bottom', 'left-edge', 'right-edge',
 ])
-const PRESS_KEYS = new Set<BrowserPressKey>([
-  'Enter', 'Escape', 'Tab', 'Space',
-  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-  'Home', 'End', 'PageUp', 'PageDown', 'Backspace', 'Delete',
-])
+const PRESS_KEYS = new Set<BrowserPressKey>(PRESS_KEY_VALUES)
+const NAMED_PRESS_KEY_SET = new Set<string>(NAMED_PRESS_KEYS)
 const WAIT_TIMEOUT_MIN_MS = 100
 const WAIT_TIMEOUT_MAX_MS = 30_000
 const WAIT_STABLE_MAX_MS = 2_000
@@ -171,16 +190,26 @@ function resolveHttpUrl(rawUrl: string): string {
   return url.href
 }
 
-/** Validate a wait-page condition received at the public service boundary. */
+/**
+ * Validate a wait-page condition received at the public service boundary.
+ * A change condition that omits documentId or afterRevision waits until the page
+ * is stable, matching kind:ready. Model tools often send kind:change without
+ * copying those snapshot fields; inventing them is worse than a ready wait.
+ */
 function resolveWaitCondition(condition: BrowserWaitCondition): BrowserWaitCondition {
   if (condition.kind === 'change') {
-    if (!PAGE_ID_PATTERN.test(condition.documentId) || !Number.isSafeInteger(condition.afterRevision) || condition.afterRevision < 0) {
+    const documentId = 'documentId' in condition ? condition.documentId : undefined
+    const afterRevision = 'afterRevision' in condition ? condition.afterRevision : undefined
+    if (typeof documentId !== 'string' || typeof afterRevision !== 'number') {
+      return { kind: 'ready' }
+    }
+    if (!PAGE_ID_PATTERN.test(documentId) || !Number.isSafeInteger(afterRevision) || afterRevision < 0) {
       throw fail('browser: wait change condition requires a documentId and non-negative afterRevision', 'BROWSER_INVALID_REQUEST')
     }
     return {
       kind: 'change',
-      documentId: brandBrowserDocumentId(condition.documentId),
-      afterRevision: condition.afterRevision,
+      documentId: brandBrowserDocumentId(documentId),
+      afterRevision,
     }
   }
   if (condition.kind === 'text') {
@@ -410,6 +439,43 @@ export class BrowserService extends TypertRemoteService {
   }
 
   /**
+   * Read recent page fetch/XHR calls and console messages captured after the in-page probe was installed.
+   * Native DevTools cannot be opened; this is the inspect surface available to the assistant.
+   * @param requestOrSignal - optional tab identity and reset flag, or the caller AbortSignal for the active tab.
+   * @param signal - caller cancellation when the first argument is a request record.
+   * @returns the tab metadata and bounded Network/Console snapshot.
+   */
+  async inspectPage(
+    requestOrSignal: BrowserInspectPageRequest | AbortSignal,
+    signal?: AbortSignal,
+  ): Promise<BrowserPageInspect> {
+    if (isAbortSignal(requestOrSignal)) {
+      return this.inspectPage({}, requestOrSignal)
+    }
+    if (signal === undefined) {
+      throw fail('browser: inspect-page requires a cancellation signal', 'BROWSER_INVALID_REQUEST')
+    }
+    const spec = this.resolveInspectPage(requestOrSignal)
+    const result = await this.invoke(spec, signal)
+    if (result.kind !== 'inspect-page') throw fail('browser: internal inspect-page result mismatch', 'BROWSER_RESULT_KIND_MISMATCH')
+    return result.inspect
+  }
+
+  /**
+   * Validate and default one inspect-page request.
+   * @param request - optional tab identity and reset flag.
+   * @returns a complete provider operation.
+   */
+  resolveInspectPage(request: BrowserInspectPageRequest): BrowserInspectPageSpec {
+    if (request.tabId !== undefined) assertTabId(request.tabId)
+    return {
+      kind: 'inspect-page',
+      reset: request.reset === true,
+      ...(request.tabId === undefined ? {} : { tabId: request.tabId }),
+    }
+  }
+
+  /**
    * Validate and brand a document-bound target returned by the latest page read.
    * @param rawPageId - page UUID supplied at the model-tool boundary.
    * @param rawRef - element reference supplied at the model-tool boundary.
@@ -529,6 +595,18 @@ export class BrowserService extends TypertRemoteService {
     if (!PRESS_KEYS.has(request.key)) {
       throw fail('browser: key is not one of the supported keyboard operations', 'BROWSER_KEY_UNSUPPORTED')
     }
+    const modifiers = {
+      ...(request.modifiers?.ctrl === true ? { ctrl: true } : {}),
+      ...(request.modifiers?.alt === true ? { alt: true } : {}),
+      ...(request.modifiers?.shift === true ? { shift: true } : {}),
+      ...(request.modifiers?.meta === true ? { meta: true } : {}),
+    }
+    if (!NAMED_PRESS_KEY_SET.has(request.key)
+      && modifiers.ctrl !== true
+      && modifiers.alt !== true
+      && modifiers.meta !== true) {
+      throw fail('browser: letter and digit keys require Control, Alt, or Meta', 'BROWSER_KEY_UNSUPPORTED')
+    }
     const repeat = request.repeat ?? 1
     if (!Number.isSafeInteger(repeat) || repeat < 1 || repeat > 20) {
       throw fail('browser: key repeat must be an integer from 1 through 20', 'BROWSER_INVALID_REQUEST')
@@ -538,12 +616,7 @@ export class BrowserService extends TypertRemoteService {
       pageId: request.pageId,
       ref: request.ref,
       key: request.key,
-      modifiers: {
-        ...(request.modifiers?.ctrl === true ? { ctrl: true } : {}),
-        ...(request.modifiers?.alt === true ? { alt: true } : {}),
-        ...(request.modifiers?.shift === true ? { shift: true } : {}),
-        ...(request.modifiers?.meta === true ? { meta: true } : {}),
-      },
+      modifiers,
       repeat,
     }
   }
@@ -650,9 +723,7 @@ export class BrowserService extends TypertRemoteService {
     const client = this.selectClient()
     const requestId = brandBrowserRequestId(randomUUID())
     const command: BrowserCommand = { requestId, clientId: client.id, operation }
-    const timeoutMs = operation.kind === 'wait-page'
-      ? Math.max(this.config.requestTimeoutMs, operation.timeoutMs + 500)
-      : this.config.requestTimeoutMs
+    const timeoutMs = hostOperationTimeoutMs(this.config.requestTimeoutMs, operation)
 
     return new Promise<BrowserOperationResult>((resolve, reject) => {
       let settled = false

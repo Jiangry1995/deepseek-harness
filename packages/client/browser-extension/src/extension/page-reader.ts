@@ -8,6 +8,7 @@ import {
   type BridgePageContent,
   type BridgePageField,
   type BridgePageOption,
+  type BridgePageRect,
   type BridgePageScrollTarget,
   type BridgePageViewport,
 } from '../protocol.ts'
@@ -23,6 +24,11 @@ const MAX_FIELD_COUNT = 80
 const MAX_ACTION_COUNT = 120
 const MAX_LABEL_LENGTH = 160
 const MAX_SHORT_FIELD_VALUE_LENGTH = 500
+const UNLABELED = '(unlabeled)'
+const POINTER_CURSOR = 'pointer'
+const INFERRED_CLICK_ROLE = 'clickable'
+/** Compact icon controls need a rect so same-looking siblings can be told apart by placement. */
+const COMPACT_ACTION_PX = 56
 
 type FieldElement = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | HTMLElement
 
@@ -92,6 +98,17 @@ function isContentEditableElement(element: HTMLElement): boolean {
   return declared === '' || declared === 'true' || declared === 'plaintext-only'
 }
 
+/** Return the rounded viewport placement used to tell same-looking controls apart. */
+function elementRect(element: HTMLElement): BridgePageRect {
+  const rect = element.getBoundingClientRect()
+  return {
+    x: Math.round(rect.left),
+    y: Math.round(rect.top),
+    width: Math.round(rect.width),
+    height: Math.round(rect.height),
+  }
+}
+
 /** Resolve the closest user-facing label for an element. */
 function elementLabel(element: HTMLElement): string {
   const labeledControl = element as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
@@ -109,7 +126,7 @@ function elementLabel(element: HTMLElement): string {
   ]
   const fallback = candidates
     .map(candidate => normalizeText(candidate ?? ''))
-    .find(candidate => candidate !== '') ?? '(unlabeled)'
+    .find(candidate => candidate !== '') ?? UNLABELED
   return (associated || fallback).slice(0, MAX_LABEL_LENGTH)
 }
 
@@ -290,16 +307,54 @@ function ariaBoolean(element: HTMLElement, name: string): boolean | undefined {
   return undefined
 }
 
+/** Parse one computed CSS rgb/rgba color into 0-255 channels. */
+function parseCssColor(value: string): { r: number; g: number; b: number; a: number } | undefined {
+  const match = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*(\d*\.?\d+))?\s*\)/.exec(value)
+  if (match === null) return undefined
+  return {
+    r: Number(match[1]),
+    g: Number(match[2]),
+    b: Number(match[3]),
+    a: match[4] === undefined ? 1 : Number(match[4]),
+  }
+}
+
+/** Return whether one color is a saturated fill rather than gray, white, or transparent. */
+function isAccentColor(value: string): boolean {
+  const color = parseCssColor(value)
+  if (color === undefined || color.a < 0.4) return false
+  const max = Math.max(color.r, color.g, color.b)
+  const min = Math.min(color.r, color.g, color.b)
+  if (max < 80) return false
+  return (max - min) / max >= 0.25
+}
+
+/** Return whether one control uses a saturated non-gray fill on itself or its nearest painted ancestor. */
+function isAccentSurface(element: HTMLElement): boolean {
+  let current: HTMLElement | null = element
+  for (let depth = 0; depth < 4 && current !== null; depth += 1) {
+    const style = window.getComputedStyle(current)
+    if (isAccentColor(style.backgroundColor)) return true
+    current = current.parentElement
+  }
+  return false
+}
+
 /** Convert one supported action element to its bounded current state. */
-function pageAction(element: HTMLElement, state: ReferenceState): BridgePageAction {
+function pageAction(element: HTMLElement, state: ReferenceState, role?: string): BridgePageAction {
+  const label = elementLabel(element)
   const action: BridgePageAction = {
     ref: assignPageRef(element, state),
-    role: actionRole(element).slice(0, 32),
-    label: elementLabel(element),
+    role: (role ?? actionRole(element)).slice(0, 32),
+    label,
     disabled: actionDisabled(element),
     inViewport: isInViewport(element),
     focused: element.ownerDocument.activeElement === element,
   }
+  const rect = elementRect(element)
+  const compact = rect.width > 0 && rect.height > 0 && rect.width <= COMPACT_ACTION_PX && rect.height <= COMPACT_ACTION_PX
+  if (label === UNLABELED || compact) action.rect = rect
+  if (isAccentSurface(element)) action.accent = true
   const context = elementContext(element)
   if (context !== undefined) action.context = context
   if (element instanceof HTMLAnchorElement) {
@@ -318,6 +373,53 @@ function pageAction(element: HTMLElement, state: ReferenceState): BridgePageActi
   const pressed = ariaBoolean(element, 'aria-pressed')
   if (pressed !== undefined) action.pressed = pressed
   return action
+}
+
+/**
+ * Return whether one pointer-cursor element is worth exposing on its own.
+ * An element already referenced by this snapshot, or one wrapping a reference,
+ * is skipped because that inner reference is the more precise click target.
+ */
+function isInferredClickTarget(element: HTMLElement): boolean {
+  if (element.hasAttribute(PAGE_REF_ATTRIBUTE)) return false
+  if (element.querySelector(`[${PAGE_REF_ATTRIBUTE}]`) !== null) return false
+  if (element.getAttribute('aria-hidden') === 'true') return false
+  const rect = element.getBoundingClientRect()
+  return rect.width > 0 && rect.height > 0 && isInViewport(element)
+}
+
+/**
+ * Record the outermost pointer-cursor element of each on-screen region.
+ * Frameworks build icon controls from click handlers on plain containers, which
+ * carry no role and no accessible name; without this pass the model has no
+ * reference for a control the user can see, such as a chat composer send icon.
+ * `cursor` inherits, so recording a region ends the descent into it.
+ * @param element - current element of the depth-first walk.
+ * @param parentCursor - computed cursor of the parent element.
+ * @param actions - actions collected so far, extended in place.
+ */
+function collectInferredClickTargets(
+  element: HTMLElement,
+  parentCursor: string,
+  actions: BridgePageAction[],
+  state: ReferenceState,
+  onTruncated: () => void,
+): void {
+  if (actions.length >= MAX_ACTION_COUNT) {
+    onTruncated()
+    return
+  }
+  const style = window.getComputedStyle(element)
+  if (style.display === 'none' || style.visibility === 'hidden') return
+  if (style.cursor === POINTER_CURSOR && parentCursor !== POINTER_CURSOR && isInferredClickTarget(element)) {
+    actions.push(pageAction(element, state, INFERRED_CLICK_ROLE))
+    return
+  }
+  for (const child of element.children) {
+    if (child instanceof HTMLElement) {
+      collectInferredClickTargets(child, style.cursor, actions, state, onTruncated)
+    }
+  }
 }
 
 /** Collect the main document and accessible same-origin child-frame documents. */
@@ -500,6 +602,9 @@ export function readVisiblePage(): BridgePageContent {
       actions.push(pageAction(candidate, referenceState))
     }
     if (actions.length >= MAX_ACTION_COUNT) break
+  }
+  for (const current of documents) {
+    collectInferredClickTargets(current.body, '', actions, referenceState, markTruncated)
   }
 
   const scrollTargets = collectScrollTargets(documents, referenceState, markTruncated)

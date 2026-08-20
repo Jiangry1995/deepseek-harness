@@ -14,7 +14,7 @@ This path keeps model-facing schemas in the Consumer, request lifecycle and erro
 
 ## Operations and results
 
-The service supports a closed set of operations: open one credential-free HTTP(S) URL, list tabs, read a current or specified page, click, fill, select, scroll, focus, or press one returned reference, wait for a page condition, activate one tab, and close one tab. A page read creates an opaque `pageId` and element refs; the extension retains the originating tab for that snapshot. A new read or navigation invalidates the preceding coordinates, and action completions must echo the requested pair. Every result repeats the operation discriminant so the Host rejects a completion for the wrong operation.
+The service supports a closed set of operations: open one credential-free HTTP(S) URL, list tabs, read a current or specified page, inspect recent page network and console observations, click, fill, select, scroll, focus, or press one returned reference, wait for a page condition, activate one tab, and close one tab. A page read creates an opaque `pageId` and element refs; the extension retains the originating tab for that snapshot. Inspect reads MAIN-world fetch/XHR and console buffers and cannot open native DevTools. A new read or navigation invalidates the preceding coordinates, and action completions must echo the requested pair. Every result repeats the operation discriminant so the Host rejects a completion for the wrong operation.
 
 ```ts type-equiv
 /** Browser tab data returned to model-facing consumers. */
@@ -47,6 +47,7 @@ type BrowserOperation =
   | BrowserOpenTabSpec
   | { kind: 'list-tabs' }
   | ({ kind: 'read-page' } & BrowserReadPageRequest)
+  | BrowserInspectPageSpec
   | ({ kind: 'click-page-element' } & BrowserPageTarget)
   | BrowserFillPageSpec
   | ({ kind: 'select-page-option' } & BrowserSelectPageRequest)
@@ -64,6 +65,7 @@ type BrowserOperationResult =
   | { kind: 'open-tab'; tab: BrowserTab }
   | { kind: 'list-tabs'; tabs: BrowserTab[] }
   | { kind: 'read-page'; page: BrowserPage }
+  | { kind: 'inspect-page'; inspect: BrowserPageInspect }
   | { kind: 'click-page-element'; receipt: BrowserPageActionReceipt }
   | { kind: 'fill-page-element'; receipt: BrowserPageActionReceipt }
   | { kind: 'select-page-option'; receipt: BrowserPageActionReceipt }
@@ -92,7 +94,7 @@ interface BrowserClientLease {
 
 ## Security and failure behavior
 
-The extension manifest grants side-panel, storage, Native Messaging, tab, scripting, and ordinary HTTP(S) page access. Extension-page frame/connect policy remains loopback-only. The background listener requires this extension's sender id and a loopback sender URL before accepting Host operations. Page reads exclude password, file, hidden, one-time-code, and payment-secret controls. Page actions accept only refs from the latest read, reject disabled or incompatible elements, and never accept arbitrary selectors. Both bridge halves validate the protocol envelope and operation-specific data, while the Host independently validates URLs, tab ids, page coordinates, selected provider identity, and result discriminants.
+The extension manifest grants side-panel, storage, Native Messaging, tab, scripting, and ordinary HTTP(S) page access. Extension-page frame/connect policy remains loopback-only. The background listener requires this extension's sender id and a loopback sender URL before accepting Host operations. Page reads exclude password, file, hidden, one-time-code, and payment-secret controls. Page inspect captures fetch/XHR metadata and console text after the MAIN-world probe is installed; it does not return request or response bodies and cannot open native DevTools. Page actions accept only refs from the latest read, reject disabled or incompatible elements, and never accept arbitrary selectors. Both bridge halves validate the protocol envelope and operation-specific data, while the Host independently validates URLs, tab ids, page coordinates, selected provider identity, and result discriminants.
 
 These checks restrict reachability; they do not authenticate a non-loopback Harness deployment. The packaged provider therefore stays loopback-only even when the HTTP server trusts another authority. Browser failures are execution errors with stable `BrowserError` codes, and missing extension state never removes the model-facing schemas.
 
@@ -171,6 +173,22 @@ async listTabs(signal: AbortSignal): Promise<BrowserTab[]>
  * @returns the tab metadata and its main-frame page snapshot.
  */
 async readPage(requestOrSignal: BrowserReadPageRequest | AbortSignal, signal?: AbortSignal): Promise<BrowserPage>
+
+/**
+ * Read recent page fetch/XHR calls and console messages captured after the in-page probe was installed.
+ * Native DevTools cannot be opened; this is the inspect surface available to the assistant.
+ * @param requestOrSignal - optional tab identity and reset flag, or the caller AbortSignal for the active tab.
+ * @param signal - caller cancellation when the first argument is a request record.
+ * @returns the tab metadata and bounded Network/Console snapshot.
+ */
+async inspectPage( requestOrSignal: BrowserInspectPageRequest | AbortSignal, signal?: AbortSignal, ): Promise<BrowserPageInspect>
+
+/**
+ * Validate and default one inspect-page request.
+ * @param request - optional tab identity and reset flag.
+ * @returns a complete provider operation.
+ */
+resolveInspectPage(request: BrowserInspectPageRequest): BrowserInspectPageSpec
 
 /**
  * Validate and brand a document-bound target returned by the latest page read.
@@ -274,7 +292,7 @@ async activateTab(tabId: number, signal: AbortSignal): Promise<BrowserTab>
 async closeTab(tabId: number, signal: AbortSignal): Promise<{ tabId: number; closed: true }>
 ```
 
-Source: [`packages/web/browser/src/index.ts:267`](../../packages/web/browser/src/index.ts)
+Source: [`packages/web/browser/src/index.ts:268`](../../packages/web/browser/src/index.ts)
 
 <a id="browser-events"></a>
 
@@ -295,5 +313,5 @@ Deliver one browser command to the selected Web Client provider.
 'browser/command'(command: BrowserCommand): void
 ```
 
-Source: [`packages/web/browser/src/types.ts:470`](../../packages/web/browser/src/types.ts)
+Source: [`packages/web/browser/src/types.ts:540`](../../packages/web/browser/src/types.ts)
 <!-- END GENERATED cordis-surface -->

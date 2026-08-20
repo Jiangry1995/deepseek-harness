@@ -31,6 +31,7 @@
 | `@deepseek-ai/dsh-tool-goal` | `create_goal`、`get_goal`、`update_goal` | `ctx.tools`、`ctx.agents`、`ctx.goals`、`ctx.systemPrompt`、`a calling Agent in an authorized open turn` | `tool/call`、`goal/change for mutations`、`tool/result` | - | create、edit、pause 和 resume 要求直接来自人类的根权限；complete 和 blocked 也接受确切的当前 Goal Round。blocked 的默认下限是 3 个获准的 Round。 |
 | `@deepseek-ai/dsh-schedule` | `schedule_create`、`schedule_delete`、`schedule_list` | `ctx.tools`、`ctx.sessions`、Session 持久化、未来创建的 live 根 Agent | `tool/call`、`schedule/change create or delete`、`tool/result` | - | 仅在选择启用的 Schedule 插件加载后创建的 live 根 Agent scope 内注册。版本 1 接受 after_seconds、显式绝对 at 和有界固定速率 every_seconds，并披露 session-local 交付；管理读取与变更必须通过共享的 Session 持久化 barrier。 |
 | `@deepseek-ai/dsh-tool-lsp` | `lsp` | `ctx.tools`、`ctx.lsp`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，因此其模型可见 schema 在更换提供方时保持稳定。运行时要求已注册提供方，例如 `@deepseek-ai/dsh-lsp-stdio`；如果没有提供方，查询会返回结构化 `LSP_UNAVAILABLE` 错误，而不会改变 schema。 |
+| `@deepseek-ai/dsh-tool-memory` | `memory_list`、`memory_note`、`memory_read`、`memory_search` | `ctx.tools`、`ctx.memory`、`ctx.systemPrompt`、`owning Agent session` | `tool/call`、`tool/result`、`host markdown under the user or project memory root` | - | memory_search、memory_list、memory_read 和 memory_note 是会话所有的文件工具。抽取和巩固在 ctx.llm 组成后于后台运行；本目录收割 schema 时不挂载 llm。 |
 | `@deepseek-ai/dsh-tool-ralph` | `ralph` | `ctx.tools`、`ctx.workflowEngine`、`ctx.subagents`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents every fresh round)` | `tool/call`、`tool/result`、`workflow and child session events during execution` | - | 固定的前台工作流会在每个 Round 启动一个全新的结构化子级；模型只能选择不可变目标和可选的 Round 上限。 |
 | `@deepseek-ai/dsh-tool-skill` | `skill` | `ctx.tools`、`ctx.agents`、`ctx.skills` | `tool/call`、`tool/result`、`user/message replacement catalogs via agent.inject()` | - | - |
 | `@deepseek-ai/dsh-tool-session-query` | `session_event_read`、`session_event_search`、`session_event_trace`、`session_search`、`session_trace` | `ctx.tools`、`ctx.systemPrompt`、`ctx.sessionQuery`、`a calling Agent for workspace authority` | `tool/call`、`tool/result` | - | 这 5 个只读工具会隐藏提供方游标，并根据不可变的调用 agent 会话为每个结果授权。该包需要选择启用；需要强制截止时间或限制行内输出的组合还会挂载通用超时或 spill 策略。 |
@@ -40,7 +41,7 @@
 | `@deepseek-ai/dsh-tool-jobs` | `job_kill`、`job_list`、`job_output` | `ctx.tools`、`ctx.jobs`、`ctx.systemPrompt` | `tool/call`、`tool/result`、`user/message via agent.inject() for background completion notices` | - | 与任务种类无关的后台任务控制器：后台 bash 命令、PTY 发送和 subagent 都通过相同的 3 个工具读取、列出和终止。加载该插件会挂接控制器，从而启用生产方的 `ctx.jobs.start()`。 |
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`、`owning Agent session` | `tool/call`、`todo/write`、`tool/result` | - | todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为检查清单。`allowParallelInProgress` 是没有默认值的必填项，因此本目录明确选择 `true`，对应描述允许同时存在多个 `in_progress` 项。选择 `false` 的部署会获得同一工具，但描述会要求只能有 1 个活动任务。 |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`、`ctx.workflowEngine`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents the script children)` | `tool/call`、`tool/result` | - | - |
-| `@deepseek-ai/dsh-tool-browser` | `browser_activate_tab`、`browser_click`、`browser_close_tab`、`browser_fill`、`browser_focus`、`browser_list_tabs`、`browser_open_tab`、`browser_press`、`browser_read_page`、`browser_scroll`、`browser_select`、`browser_wait_for` | `ctx.tools`、`ctx.browser`、`ctx.systemPrompt` | `tool/call`、`browser/command Remote event`、`tool/result` | - | 浏览器工具把 MV3 提供方和带租约的 Host 路由置于 ctx.browser 之后；默认情况下，每项操作都会进入审批链。 |
+| `@deepseek-ai/dsh-tool-browser` | `browser_activate_tab`、`browser_click`、`browser_close_tab`、`browser_fill`、`browser_focus`、`browser_inspect`、`browser_list_tabs`、`browser_open_tab`、`browser_press`、`browser_read_page`、`browser_scroll`、`browser_select`、`browser_wait_for` | `ctx.tools`、`ctx.browser`、`ctx.systemPrompt` | `tool/call`、`browser/command Remote event`、`tool/result` | - | 浏览器工具把 MV3 提供方和带租约的 Host 路由置于 ctx.browser 之后；默认情况下，每项操作都会进入审批链。 |
 | `@deepseek-ai/dsh-tool-web` | `web_fetch`、`web_search` | `ctx.tools`、`ctx.web`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | web_search 和 web_fetch 将提供方选择置于 ctx.web 之后，使模型可见 schema 在更换后端时保持稳定。 |
 
 <a id="deepseek-aidsh-tool-ask-user"></a>
@@ -1182,6 +1183,126 @@ create、edit、pause 和 resume 要求直接来自人类的根权限；complete
 
 lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，因此其模型可见 schema 在更换提供方时保持稳定。运行时要求已注册提供方，例如 `@deepseek-ai/dsh-lsp-stdio`；如果没有提供方，查询会返回结构化 `LSP_UNAVAILABLE` 错误，而不会改变 schema。
 
+
+<a id="deepseek-aidsh-tool-memory"></a>
+
+## `@deepseek-ai/dsh-tool-memory`
+
+### `memory_list`
+
+列举用户级或项目级记忆中的 markdown 文件。不返回 state.json 等隐藏宿主文件。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "scope": {
+      "type": "string",
+      "description": "Which memory tree to list. Defaults to user. Project requires a working directory.",
+      "enum": [
+        "user",
+        "project"
+      ]
+    }
+  }
+}
+```
+
+来源：[`packages/memory/tool-memory/src/index.ts`](../packages/memory/tool-memory/src/index.ts)
+
+### `memory_note`
+
+仅当用户明确要求记住、忘掉或修改已存储事实时写入收件箱笔记。不要为普通对话调用此工具。后台任务会把笔记巩固进 MEMORY.md；不要自己编辑手册。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "content": {
+      "type": "string",
+      "description": "The fact to remember, or the instruction to forget or revise an existing fact."
+    },
+    "scope": {
+      "type": "string",
+      "description": "Which memory tree receives the note. Defaults to user. Project requires a working directory.",
+      "enum": [
+        "user",
+        "project"
+      ]
+    },
+    "slug": {
+      "type": "string",
+      "description": "Optional filename slug. Derived from content when omitted."
+    }
+  },
+  "required": [
+    "content"
+  ]
+}
+```
+
+来源：[`packages/memory/tool-memory/src/index.ts`](../packages/memory/tool-memory/src/index.ts)
+
+### `memory_read`
+
+按相对根路径读取一份记忆 markdown。用 memory_list 或 memory_search 发现路径。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "path": {
+      "type": "string",
+      "description": "Root-relative POSIX path such as MEMORY.md or notes/….md."
+    },
+    "scope": {
+      "type": "string",
+      "description": "Which memory tree to read. Defaults to user. Project requires a working directory.",
+      "enum": [
+        "user",
+        "project"
+      ]
+    }
+  },
+  "required": [
+    "path"
+  ]
+}
+```
+
+来源：[`packages/memory/tool-memory/src/index.ts`](../packages/memory/tool-memory/src/index.ts)
+
+### `memory_search`
+
+在用户级或项目级记忆 markdown 中做大小写不敏感的子串搜索。在依据既有偏好或常驻事实作答前使用。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "query": {
+      "type": "string",
+      "description": "Case-insensitive substring to find."
+    },
+    "scope": {
+      "type": "string",
+      "description": "Which memory tree to search. Defaults to user. Project requires a working directory.",
+      "enum": [
+        "user",
+        "project"
+      ]
+    }
+  },
+  "required": [
+    "query"
+  ]
+}
+```
+
+来源：[`packages/memory/tool-memory/src/index.ts`](../packages/memory/tool-memory/src/index.ts)
+
+memory_search、memory_list、memory_read 和 memory_note 是会话所有的文件工具。抽取和巩固在 ctx.llm 组成后于后台运行；本目录收割 schema 时不挂载 llm。
+
 <a id="deepseek-aidsh-tool-ralph"></a>
 
 ## `@deepseek-ai/dsh-tool-ralph`
@@ -1924,7 +2045,7 @@ todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为
     },
     "submit": {
       "type": "boolean",
-      "description": "Submit the owning form or dispatch Enter after filling. Defaults to false."
+      "description": "Submit the owning form, click a nearby send or submit control when there is no form, or dispatch Enter after filling. Defaults to false."
     }
   },
   "required": [
@@ -1958,6 +2079,28 @@ todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为
     "pageId",
     "ref"
   ]
+}
+```
+
+来源：[`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/src/index.ts)
+
+### `browser_inspect`
+
+读取浏览器标签页最近的页面 fetch/XHR 请求和控制台消息。无法打开原生 DevTools。省略 tabId 则检查当前活动 web 标签。不返回请求和响应正文。如果日志为空，先触发页面动作再检查一次。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "tabId": {
+      "type": "number",
+      "description": "Browser-assigned tab id to inspect without first activating it. Omit to inspect the current active web tab."
+    },
+    "reset": {
+      "type": "boolean",
+      "description": "Clear the in-page buffers after this snapshot. Defaults to false."
+    }
+  }
 }
 ```
 
@@ -2133,7 +2276,7 @@ todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为
 
 ### `browser_wait_for`
 
-等待页面发生变化、出现或消失指定文本、到达某个 URL，或进入稳定状态，然后返回新的页面快照。优先使用最近一次 browser_read_page 返回的 pageId；只有尚无页面快照时才使用 tabId。不要编造标签页 id。
+等待页面发生变化、出现或消失指定文本、到达某个 URL，或进入稳定状态，然后返回新的页面快照。优先使用最近一次 browser_read_page 返回的 pageId；只有尚无页面快照时才使用 tabId。不要编造标签页 id。动作后优先使用 kind:ready 或 kind:text；不带 documentId 和 afterRevision 的 kind:change 会等到页面稳定。
 
 ```json
 {
@@ -2149,7 +2292,7 @@ todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为
     },
     "condition": {
       "type": "object",
-      "description": "Wait condition: {kind:\"change\",documentId,afterRevision}, {kind:\"text\",text,state:\"present\"|\"absent\"}, {kind:\"url\",value,match:\"exact\"|\"prefix\"|\"contains\"}, or {kind:\"ready\"}.",
+      "description": "Wait condition: {kind:\"change\",documentId,afterRevision}, {kind:\"text\",text,state:\"present\"|\"absent\"}, {kind:\"url\",value,match:\"exact\"|\"prefix\"|\"contains\"}, or {kind:\"ready\"}. A change condition without documentId and afterRevision waits until the page is stable, the same as kind:ready.",
       "additionalProperties": true,
       "properties": {
         "kind": {

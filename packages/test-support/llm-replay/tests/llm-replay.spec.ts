@@ -1071,6 +1071,27 @@ describe('installLlmReplay (per-session keying)', () => {
     expect(await drain(ctx.llm.stream(live('B')))).toEqual(b2)
   })
 
+  it('does not consume a session script for purpose memory auxiliary calls', async () => {
+    const a2: StreamChunk[] = [{ type: 'text-delta', index: 0, text: 'a2' }, { type: 'finish', reason: { kind: 'stop' } }]
+    const parentFile = writeSession('session.jsonl', { id: 'p', createdAt: 1 }, [TEXT_CHUNKS, a2])
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    installLlmReplay(ctx, { file: parentFile })
+    expect(await drain(ctx.llm.stream(live('A')))).toEqual(TEXT_CHUNKS)
+    const memoryChunks = await drain(ctx.llm.stream({ ...live('A'), purpose: 'memory' }))
+    expect(memoryChunks.some(chunk => chunk.type === 'text-delta' && chunk.text.includes('"raw_memory":""'))).toBe(true)
+    expect(await drain(ctx.llm.stream(live('A')))).toEqual(a2)
+  })
+
+  it('aborts a canned memory replay when the signal is already aborted', async () => {
+    const parentFile = writeSession('session.jsonl', { id: 'p', createdAt: 1 }, [TEXT_CHUNKS])
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    installLlmReplay(ctx, { file: parentFile })
+    const signal = AbortSignal.abort()
+    await expect(drain(ctx.llm.stream({ ...live('A'), purpose: 'memory', signal }))).rejects.toThrow(/aborted/)
+  })
+
   it('treats a call with no sessionId as the single anonymous (primary) session', async () => {
     const parentFile = writeSession('session.jsonl', { id: 'p', createdAt: 1 }, [TEXT_CHUNKS])
     const ctx = new Context()

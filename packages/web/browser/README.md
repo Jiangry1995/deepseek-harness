@@ -20,16 +20,16 @@ Web Clients register generated provider identities through the Typert Remote met
 
 Each operation selects the most recently seen live provider, emits one `browser/command` Remote event addressed to that provider, and retains the request until the provider completes it, the caller aborts, the configured timeout elapses, the provider disconnects, or the service is disposed. Completion is accepted only from the selected provider and only when its result discriminant matches the operation.
 
-`openTab` accepts absolute credential-free HTTP(S) URLs and defaults `active` to `true`. `listTabs` returns tabs from the extension's current browser window. `readPage` returns the requested or current web tab, rendered text, current visible non-secret form values and focus state, clickable elements, scroll targets, viewport metrics, a snapshot `pageId`, a stable `documentId`, a document `revision`, element refs, and a truncation marker. `clickPage`, `fillPage`, `selectPage`, `scrollPage`, `focusPage`, and `pressPage` accept a `pageId/ref` pair from the latest read; the Host requires the completion receipt to echo the same pair. Fill defaults `submit` to `false` and the provider must verify the control's actual value. `waitPage` accepts the latest `pageId`, or a tab id when no snapshot exists, waits for document change, text, URL, or load stability, and returns a fresh snapshot. `activateTab` and `closeTab` accept non-negative safe-integer tab ids returned by the browser.
+`openTab` accepts absolute credential-free HTTP(S) URLs and defaults `active` to `true`. `listTabs` returns tabs from the extension's current browser window. `readPage` returns the requested or current web tab, rendered text, current visible non-secret form values and focus state, clickable elements, scroll targets, viewport metrics, a snapshot `pageId`, a stable `documentId`, a document `revision`, element refs, and a truncation marker. `inspectPage` returns recent page fetch/XHR calls and console messages captured after the in-page probe was installed; it cannot open native DevTools and does not return request or response bodies. `clickPage`, `fillPage`, `selectPage`, `scrollPage`, `focusPage`, and `pressPage` accept a `pageId/ref` pair from the latest read; the Host requires the completion receipt to echo the same pair. Fill defaults `submit` to `false` and the provider must verify the control's actual value. `pressPage` accepts named keys and, with Control, Alt, or Meta, letter and digit page shortcuts. `waitPage` accepts the latest `pageId`, or a tab id when no snapshot exists, waits for document change, text, URL, or load stability, and returns a fresh snapshot. `activateTab` and `closeTab` accept non-negative safe-integer tab ids returned by the browser.
 
 ## Configuration
 
 | Field | Default | Meaning |
 |---|---:|---|
-| `requestTimeoutMs` | `15000` | Maximum Host wait for one extension completion. |
+| `requestTimeoutMs` | `15000` | Maximum Host wait for one extension completion. `wait-page` uses `max(requestTimeoutMs, timeoutMs + 1500)`. |
 | `clientLeaseMs` | `300000` | Provider lease duration since the last successful registration or heartbeat. Long enough to survive Chromium throttling hidden iframe timers to about one tick per minute. |
 
-The Client receives both values in its lease. It renews at half the advertised lease duration and retains each page-to-extension request for the Host timeout.
+The Client receives both values in its lease. It renews at half the advertised lease duration and retains each page-to-extension request for the Host timeout minus 1000ms of slack. `wait-page` uses the same Host formula as this service before subtracting slack, so the in-page wait can finish first.
 
 ## Errors
 

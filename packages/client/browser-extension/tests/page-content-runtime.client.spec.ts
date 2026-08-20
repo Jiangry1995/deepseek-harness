@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { PageActionError } from '../src/extension/page-actor.ts'
 import { PageWaitError } from '../src/extension/page-waiter.ts'
-import type { BridgePageActionOperation, BridgePageActionReceipt, BridgePageContent } from '../src/protocol.ts'
+import type { BridgePageActionOperation, BridgePageActionReceipt, BridgePageContent, BridgePageInspectContent } from '../src/protocol.ts'
 import {
   installPageReader,
   isActPageDomRequest,
+  isInspectPageDomRequest,
   isReadPageDomRequest,
   isWaitPageDomRequest,
 } from '../src/extension/page-content-runtime.ts'
@@ -81,6 +82,8 @@ describe('page content reader', () => {
       kind: 'dsh-wait-page',
       operation: { condition: { kind: 'ready' }, timeoutMs: 50, stableMs: 0 },
     })).toBe(false)
+    expect(isInspectPageDomRequest({ kind: 'dsh-inspect-page', reset: false })).toBe(true)
+    expect(isInspectPageDomRequest({ kind: 'dsh-inspect-page' })).toBe(false)
   })
 
   it('answers page-read requests synchronously and ignores other messages', () => {
@@ -175,6 +178,26 @@ describe('page content reader', () => {
           message: `BROWSER_WAIT_TIMEOUT: url=https://example.test/ documentId=${documentId} revision=4`,
         },
       })
+    })
+  })
+
+  it('answers inspect requests asynchronously from the MAIN-world collector', async () => {
+    const runtime = runtimeApi()
+    const content: BridgePageInspectContent = {
+      hooked: false,
+      network: [],
+      console: [],
+      omittedNetwork: 0,
+      omittedConsole: 0,
+    }
+    const inspectPage = vi.fn(async () => content)
+    installPageReader(runtime.api, vi.fn(), vi.fn(), vi.fn(), inspectPage)
+    const sendResponse = vi.fn()
+
+    expect(runtime.listener()({ kind: 'dsh-inspect-page', reset: true }, {}, sendResponse)).toBe(true)
+    expect(inspectPage).toHaveBeenCalledWith(true)
+    await vi.waitFor(() => {
+      expect(sendResponse).toHaveBeenCalledWith({ ok: true, content })
     })
   })
 })
