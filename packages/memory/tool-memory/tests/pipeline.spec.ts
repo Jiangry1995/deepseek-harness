@@ -83,6 +83,16 @@ function jsonScript(value: unknown): StreamChunk[] {
 }
 
 /**
+ * Wrap a provider failure as a terminal finish stream.
+ * @param message - failure message.
+ * @param code - failure code.
+ * @returns stream chunks.
+ */
+function errorScript(message: string, code = 'PROVIDER'): StreamChunk[] {
+  return [{ type: 'finish', reason: { kind: 'error', failure: { message, code } } }]
+}
+
+/**
  * Build a stub agent over a live session.
  * @param ctx - root context.
  * @param session - live session.
@@ -327,10 +337,7 @@ describe('memory pipeline', () => {
   })
 
   it('logs LLM failures without throwing and still advances the watermark', async () => {
-    const adapter = new ScriptAdapter([{
-      type: 'finish',
-      reason: { kind: 'error', failure: { message: 'boom', code: 'PROVIDER' } },
-    }])
+    const adapter = new ScriptAdapter([errorScript('boom')])
     const { ctx, pipeline, session } = await pipelineHarness(adapter)
     const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => undefined)
     appendTurn(session, 1, 'remember this badge color')
@@ -576,10 +583,7 @@ describe('memory pipeline', () => {
 
   it('runs a later turn after an earlier extraction failure', async () => {
     const adapter = new ScriptAdapter([
-      {
-        type: 'finish',
-        reason: { kind: 'error', failure: { message: 'first boom', code: 'PROVIDER' } },
-      },
+      errorScript('first boom'),
       jsonScript({
         scope: 'user',
         raw_memory: 'Recovered fact.',
