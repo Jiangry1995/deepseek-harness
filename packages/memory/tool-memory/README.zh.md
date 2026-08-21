@@ -2,11 +2,11 @@
 
 [English](README.md) | 中文
 
-面向模型的记忆工具、常驻 HOWTO 注入，以及运行在 [`@deepseek-ai/dsh-memory`](../memory/README.md) 之上的后台抽取后巩固流水线。
+面向模型的记忆工具、常驻 HOWTO 注入，以及运行在 [`@deepseek-ai/dsh-memory`](../memory/README.zh.md) 之上的后台抽取后巩固流水线。
 
 ## 导出形态
 
-函数/命名空间插件：导出 `name` / `inject` / `apply`，且没有 default。多余的 `export default` 会经 Loader 的 `unwrapExports` 折叠模块并丢掉 `inject`（见 [docs/postmortem/0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.md)）。`inject` 为 `['memory', 'tools', 'systemPrompt']`。流水线通过 `ctx.inject` 等待 `llm` 和 `agents`，以便 schema 收割可以在不挂载这些服务的情况下注册工具。
+函数/命名空间插件：导出 `name` / `inject` / `apply`，且没有 default。多余的 `export default` 会经 Loader 的 `unwrapExports` 折叠模块并丢掉 `inject`（见 [docs/postmortem/0001](../../../docs/postmortem/0001-acp-default-export-drops-inject.zh.md)）。`inject` 为 `['memory', 'tools', 'systemPrompt']`。流水线通过 `ctx.inject` 等待 `llm` 和 `agents`，以便 schema 收割可以在不挂载这些服务的情况下注册工具。
 
 ## 工具
 
@@ -70,7 +70,7 @@ Preserve still-true facts, drop stale ones, and never copy secrets or one-off ta
 
 #### 模型看到什么
 
-模型看到生成的 [`memory_search`](../../../docs/tool-catalog.md#deepseek-aidsh-tool-memory)、`memory_list`、`memory_read` 和 `memory_note` schema。
+模型看到生成的 [`memory_search`](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-memory)、`memory_list`、`memory_read` 和 `memory_note` schema。
 
 #### Token 影响
 

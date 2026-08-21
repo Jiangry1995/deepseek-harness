@@ -2,9 +2,9 @@
 
 [English](README.md) | 中文
 
-为明确排除图片输入的已注册模型提供自动、可持久恢复的图片转文本降级。插件向 [`ctx.llm`](../llm/README.md) 注册进程内唯一的 `LlmImageFallback`。原生视觉模型不受影响，模态信息未知的模型仍由其适配器决定，只有确切模型的 `inputModalities` 不含 `image` 时才会进入本提供方。
+为明确排除图片输入的已注册模型提供自动、可持久恢复的图片转文本降级。插件向 [`ctx.llm`](../llm/README.zh.md) 注册进程内唯一的 `LlmImageFallback`。原生视觉模型不受影响，模态信息未知的模型仍由其适配器决定，只有确切模型的 `inputModalities` 不含 `image` 时才会进入本提供方。
 
-辅助模型是另一条已注册 LLM 路由。先在 Web **模型**页面配置该路由及其凭据，再到**设置 → 插件 → 自动识图**选择它。可安装的 [`@deepseek-ai/dsh-vision-fallback`](../../bundle/vision-fallback/README.md) bundle 同时携带本 Host 插件和配套 Web 标签页，不会把它加入 `dsh-base` 默认组合。
+辅助模型是另一条已注册 LLM 路由。先在 Web **模型**页面配置该路由及其凭据，再到**设置 → 插件 → 自动识图**选择它。可安装的 [`@deepseek-ai/dsh-vision-fallback`](../../bundle/vision-fallback/README.zh.md) bundle 同时携带本 Host 插件和配套 Web 标签页，不会把它加入 `dsh-base` 默认组合。
 
 ```yaml
 - name: '@deepseek-ai/dsh-llm-vision-fallback'

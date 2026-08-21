@@ -6,11 +6,11 @@
 // share the store seat exists for) and derives the call material from the
 // session snapshot — no data of its own.
 
-import { Fragment } from 'react'
+import { Fragment, useCallback } from 'react'
 import { CodeBlock } from '@deepseek-ai/dsh-client-ui-primitives'
 import { shallowEqual } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConversationSnapshot, RunningToolCall, ToolCallBlock, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
-import type { DetailsSlotProps } from '../contract/slots.ts'
+import type { DetailsSlotProps, RenderMessageImages } from '../contract/slots.ts'
 import { findToolCall } from '../chat/tool-node-reader.ts'
 import css from './DetailsPanel.module.css'
 
@@ -74,6 +74,10 @@ export function DetailsPanel({ useSession, useSessions, sessionId, useStore, ren
   const material = useSession(
     s => (callId === undefined ? null : materialFor(s, callId)),
     (a, b) => shallowEqual(a, b))
+  const renderImages = useCallback<RenderMessageImages>(
+    owner => renderSlot('conversation.details.images', { ...owner, loadImage }),
+    [loadImage, renderSlot],
+  )
 
   return (
     <div className={css.root}>
@@ -110,7 +114,7 @@ export function DetailsPanel({ useSession, useSessions, sessionId, useStore, ren
                       would otherwise carry into the next selection because the
                       panel does not unmount between calls. */}
                   <Fragment key={callId}>
-                    {renderSlot('conversation.details.tool', { block: material.block, cwd: sessionCwd, loadImage }, {
+                    {renderSlot('conversation.details.tool', { block: material.block, cwd: sessionCwd, renderImages }, {
                       fallback: 'kind' in material.block
                         ? (
                           <pre className={css.code} data-error={material.block.isError || undefined}>

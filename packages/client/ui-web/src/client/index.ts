@@ -55,7 +55,7 @@ export function apply(ctx: ClientContext): void {
       // Failure strings stay English (error-surface policy: not localized).
       setWebNetworking: async (enabled) => {
         const line = enabled ? '/web' : '/web off'
-        const result = await ctx.remote.commands.execute(sessionId, line)
+        const result = await ctx.remote.commands.execute(sessionId, line, [])
         if (!result.ok) return `${result.error.message} (${result.error.code})`
         if (result.value === undefined) return `unknown command: ${line}`
         return null

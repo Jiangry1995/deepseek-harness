@@ -287,7 +287,7 @@ function rememberPageTab(pageId: string, tabId: number): void {
   pageTabIds.delete(pageId)
   pageTabIds.set(pageId, tabId)
   while (pageTabIds.size > PAGE_TAB_ID_MAX) {
-    const oldest = pageTabIds.keys().next().value as string | undefined
+    const oldest = pageTabIds.keys().next().value
     if (oldest === undefined) return
     pageTabIds.delete(oldest)
   }

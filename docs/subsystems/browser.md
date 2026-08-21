@@ -104,7 +104,7 @@ These checks restrict reachability; they do not authenticate a non-loopback Harn
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxbrowser--browserservice"></a>
 
@@ -292,7 +292,7 @@ async activateTab(tabId: number, signal: AbortSignal): Promise<BrowserTab>
 async closeTab(tabId: number, signal: AbortSignal): Promise<{ tabId: number; closed: true }>
 ```
 
-Source: [`packages/web/browser/src/index.ts:296`](../../packages/web/browser/src/index.ts)
+Source: [`packages/web/browser/src/index.ts`](../../packages/web/browser/src/index.ts)
 
 <a id="browser-events"></a>
 
@@ -313,5 +313,5 @@ Deliver one browser command to the selected Web Client provider.
 'browser/command'(command: BrowserCommand): void
 ```
 
-Source: [`packages/web/browser/src/types.ts:552`](../../packages/web/browser/src/types.ts)
+Source: [`packages/web/browser/src/types.ts`](../../packages/web/browser/src/types.ts)
 <!-- END GENERATED cordis-surface -->

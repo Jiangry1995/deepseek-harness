@@ -47,7 +47,7 @@ export const CONSOLIDATION_SYSTEM_PROMPT = [
 export function startMemoryPipeline(ctx: Context, config: ResolvedMemoryToolConfig): MemoryPipeline {
   const controller = new AbortController()
   const pipeline = new MemoryPipeline(ctx, config, controller.signal)
-  ctx.effect(() => () => controller.abort())
+  ctx.effect(() => () =>{  controller.abort() })
   ctx.on('session/event', (session, event) => {
     if (event.type !== 'turn/end') return
     const agent = ctx.agents.get(session.id)

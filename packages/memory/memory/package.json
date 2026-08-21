@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-memory",
   "description": "Local markdown memory store (ctx.memory) for DeepSeek Harness user-level and project-level files",
-  "version": "0.1.0-rc.5",
+  "version": "0.1.1-rc.1",
   "publishConfig": {
     "access": "public"
   },

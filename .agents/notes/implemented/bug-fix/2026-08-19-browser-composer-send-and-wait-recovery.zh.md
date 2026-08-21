@@ -10,7 +10,7 @@ Status: implemented
 
 只有图标、没有无障碍名称的发送和删除按钮在快照里会变成 `(unlabeled)`，模型分不清它们，于是默认按 Enter。
 
-`tool:browser` 提示词要求每次页面动作后都调用 `browser_wait_for`。模型就会只传 `{kind:"change"}`，不带 `documentId` 和 `afterRevision`，Host 以 `BROWSER_INVALID_REQUEST` 拒绝。随后用同一次填写的 `pageId` 再等待时，若 Service Worker 已重启，会得到 `BROWSER_PAGE_STALE`：等待把内存绑定缺失当成致命错误，而填写已经会退回焦点页签。该对照作为现行事实记录在[语义浏览器自动化](../feature/2026-08-16-semantic-browser-automation.md)。
+`tool:browser` 提示词要求每次页面动作后都调用 `browser_wait_for`。模型就会只传 `{kind:"change"}`，不带 `documentId` 和 `afterRevision`，Host 以 `BROWSER_INVALID_REQUEST` 拒绝。随后用同一次填写的 `pageId` 再等待时，若 Service Worker 已重启，会得到 `BROWSER_PAGE_STALE`：等待把内存绑定缺失当成致命错误，而填写已经会退回焦点页签。该对照作为现行事实记录在[语义浏览器自动化](../feature/2026-08-16-semantic-browser-automation.zh.md)。
 
 ## 决策
 
@@ -36,7 +36,7 @@ Status: implemented
 
 ## 影响
 
-Enter 和 fill-submit 可以在没有站点适配器的情况下发出 SPA 聊天。不完整的 `kind:change` 等待不再中断循环。Service Worker 重启不再让只带 pageId 的等待变成过期。点击图标或发送簇外壳会激活具名发送控件，而不是旁边的删除。紧凑且带 accent 的动作带有位置，颜色和方位说明才能选对 ref。仍然只提供无标签发送图标的页面，在补上无障碍名称之前仍更难按名称点击。既 preventDefault Enter 又真正发出的输入框可能会被点第二次。超过默认 Host 请求超时的 wait-page Host 与页面桥定时器由[等待页 Host 与页面桥定时器](2026-08-20-browser-wait-bridge-timeout.md)负责。
+Enter 和 fill-submit 可以在没有站点适配器的情况下发出 SPA 聊天。不完整的 `kind:change` 等待不再中断循环。Service Worker 重启不再让只带 pageId 的等待变成过期。点击图标或发送簇外壳会激活具名发送控件，而不是旁边的删除。紧凑且带 accent 的动作带有位置，颜色和方位说明才能选对 ref。仍然只提供无标签发送图标的页面，在补上无障碍名称之前仍更难按名称点击。既 preventDefault Enter 又真正发出的输入框可能会被点第二次。超过默认 Host 请求超时的 wait-page Host 与页面桥定时器由[等待页 Host 与页面桥定时器](2026-08-20-browser-wait-bridge-timeout.zh.md)负责。
 
 ## 测试
 

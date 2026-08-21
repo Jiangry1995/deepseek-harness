@@ -16,7 +16,7 @@ Status: implemented
 
 `memory_note` 仅在用户明确要求记住、忘掉或修改已存事实时运行。闲聊是 no-op。`AGENTS.md` 不是记忆。仅当已完成回合含记住/忘掉类措辞或含工具调用时才运行 Phase 1。当 Phase 1 写出内容或存在待处理笔记时才运行 Phase 2。同一会话已完成的 `turn/end` 立即抽取，因此从不重启的侧边栏仍会更新。`agent/session-start` 会补抽水印之后的已完成回合。subagent 会话和 `delegationDepth > 0` 会被跳过。中止不推进水印。失败只记日志，不中止 agent（智能体）。插件写入的 `user/message` 不会进入抽取转录。没有新的 `SessionEventMap` 记忆事件。
 
-交付的 `dsh-base` bundle 挂载 `memory` 存储，`userRoot: !!js dshHomePath('memory')`，并在宿主平面挂载 TUI 用的 `tool-memory`。Web overlay 会禁用该宿主工具行；交付的 `standard` / `code` / `cordis` preset 按会话重新挂载。`examples/mcp-memory/` overlay 仍是默认关闭的互操作示例。[第三方记忆 MCP 示例 Agent Note](2026-07-31-third-party-memory-mcp-examples.md) 仍然拒绝把那些 overlay 做成官方产品；它并不拒绝这份第一方文件存储。
+交付的 `dsh-base` bundle 挂载 `memory` 存储，`userRoot: !!js dshHomePath('memory')`，并在宿主平面挂载 TUI 用的 `tool-memory`。Web overlay 会禁用该宿主工具行；交付的 `standard` / `code` / `cordis` preset 按会话重新挂载。`examples/mcp-memory/` overlay 仍是默认关闭的互操作示例。[第三方记忆 MCP 示例 Agent Note](2026-07-31-third-party-memory-mcp-examples.zh.md) 仍然拒绝把那些 overlay 做成官方产品；它并不拒绝这份第一方文件存储。
 
 ## 考虑过的替代方案
 
@@ -36,4 +36,4 @@ Status: implemented
 
 ## 相关
 
-[第三方记忆 MCP 示例](2026-07-31-third-party-memory-mcp-examples.md) 负责默认关闭的提供方 overlay。本笔记负责那些 overlay 所不是的第一方文件存储。
+[第三方记忆 MCP 示例](2026-07-31-third-party-memory-mcp-examples.zh.md) 负责默认关闭的提供方 overlay。本笔记负责那些 overlay 所不是的第一方文件存储。

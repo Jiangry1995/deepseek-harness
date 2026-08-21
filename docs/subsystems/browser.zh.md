@@ -2,7 +2,7 @@
 
 [English](browser.md) | 中文
 
-浏览器能力让 agent（智能体）控制用户当前 Chromium 窗口中的标签页，并操作页面读取结果所引用的元素，而不把浏览器 API 放进 Host 进程。其 Service Definition 与 Host 代理位于 [`dsh-browser`](../../packages/web/browser)，Service Provider 是 [`dsh-client-browser-extension`](../../packages/client/browser-extension)，Consumer 是 [`dsh-tool-browser`](../../packages/web/tool-browser)。跨进程路由由[浏览器标签页 Agent Note](../../.agents/notes/implemented/feature/2026-08-14-browser-tab-extension.md)负责；文档绑定交互与本机伴随程序生命周期由[页面控制 Agent Note](../../.agents/notes/implemented/feature/2026-08-16-browser-side-assistant-page-control.md)负责。
+浏览器能力让 agent（智能体）控制用户当前 Chromium 窗口中的标签页，并操作页面读取结果所引用的元素，而不把浏览器 API 放进 Host 进程。其 Service Definition 与 Host 代理位于 [`dsh-browser`](../../packages/web/browser)，Service Provider 是 [`dsh-client-browser-extension`](../../packages/client/browser-extension)，Consumer 是 [`dsh-tool-browser`](../../packages/web/tool-browser)。跨进程路由由[浏览器标签页 Agent Note](../../.agents/notes/implemented/feature/2026-08-14-browser-tab-extension.zh.md)负责；文档绑定交互与本机伴随程序生命周期由[页面控制 Agent Note](../../.agents/notes/implemented/feature/2026-08-16-browser-side-assistant-page-control.zh.md)负责。
 
 源码：[`packages/web/browser/src/types.ts`](../../packages/web/browser/src/types.ts)
 
@@ -104,7 +104,7 @@ interface BrowserClientLease {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxbrowser--browserservice"></a>
 
@@ -292,7 +292,7 @@ async activateTab(tabId: number, signal: AbortSignal): Promise<BrowserTab>
 async closeTab(tabId: number, signal: AbortSignal): Promise<{ tabId: number; closed: true }>
 ```
 
-Source: [`packages/web/browser/src/index.ts:296`](../../packages/web/browser/src/index.ts)
+Source: [`packages/web/browser/src/index.ts`](../../packages/web/browser/src/index.ts)
 
 <a id="browser-events"></a>
 
@@ -313,5 +313,5 @@ Deliver one browser command to the selected Web Client provider.
 'browser/command'(command: BrowserCommand): void
 ```
 
-Source: [`packages/web/browser/src/types.ts:552`](../../packages/web/browser/src/types.ts)
+Source: [`packages/web/browser/src/types.ts`](../../packages/web/browser/src/types.ts)
 <!-- END GENERATED cordis-surface -->

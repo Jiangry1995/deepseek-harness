@@ -97,13 +97,13 @@ export class WebNetworkingController extends Service {
     ctx.inject(['sessionProjections'], (projectionCtx) => {
       projectionCtx.sessionProjections.register<'webNetworking', WebNetworkingProjection>({
         key: 'webNetworking',
-        schema: projectionSchema,
+        stateSchema: projectionSchema,
         init: () => ({ enabled: true }),
         apply: (state, event) => {
           if (event.type === 'web/networking') return { enabled: event.data.enabled }
           return state
         },
-        view: state => state,
+        wire: { viewSchema: projectionSchema, view: state => state },
         stateVersion: 1,
       })
     })

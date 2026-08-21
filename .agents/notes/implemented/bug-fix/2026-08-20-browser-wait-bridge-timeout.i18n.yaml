@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-20-browser-wait-bridge-timeout.md
 2026-08-20-browser-wait-bridge-timeout.md: 7302534ebd44a5de43c2fbb9ef1a06f9eece88cc
-2026-08-20-browser-wait-bridge-timeout.zh.md: ec2408e7f500e1d4c8709c9b79fb0aff8a6ca9aa
+2026-08-20-browser-wait-bridge-timeout.zh.md: f6558a32257174554f0bbc0482d49c7a1f37d2b0

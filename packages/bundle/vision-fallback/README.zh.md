@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-为明确纯文本模型路由提供自动识图的可选安装 bundle。它的 [`cordis.patch.yml`](cordis.patch.yml) 会插入 [`@deepseek-ai/dsh-llm-vision-fallback`](../../llm/llm-vision-fallback/README.md)，并为 [`@deepseek-ai/dsh-client-ui-settings-vision-fallback`](../../client/ui-settings-vision-fallback/README.md) 插入一个 Host 侧空操作配置项；后者的 `dsh.client` 声明让 Web 模块扫描器贡献浏览器标签页。
+为明确纯文本模型路由提供自动识图的可选安装 bundle。它的 [`cordis.patch.yml`](cordis.patch.yml) 会插入 [`@deepseek-ai/dsh-llm-vision-fallback`](../../llm/llm-vision-fallback/README.zh.md)，并为 [`@deepseek-ai/dsh-client-ui-settings-vision-fallback`](../../client/ui-settings-vision-fallback/README.zh.md) 插入一个 Host 侧空操作配置项；后者的 `dsh.client` 声明让 Web 模块扫描器贡献浏览器标签页。
 
 ```powershell
 dsh plugin --profile web add @deepseek-ai/dsh-vision-fallback

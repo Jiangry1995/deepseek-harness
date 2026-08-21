@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-settings-vision-fallback/README.md
 README.md: 814f5931a4eaa34ec11fe108ada98d9b7f3ede51
-README.zh.md: 13ce1d924d44bb0cab1f498c540fa79744b0af24
+README.zh.md: 1821020a69b534c1a5c027747bfc907d9376ef20

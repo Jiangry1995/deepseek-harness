@@ -30,9 +30,6 @@
       "path": "../ui-slots"
     },
     {
-      "path": "../web-react"
-    },
-    {
       "path": "../../web/web-networking"
     },
     {

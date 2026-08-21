@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-14-browser-tab-extension.md
 2026-08-14-browser-tab-extension.md: a70ea3b982b69d46728234a4734cbf4de9189968
-2026-08-14-browser-tab-extension.zh.md: 8ba1e1b423d7d0393c379ba7a9d052f48b911325
+2026-08-14-browser-tab-extension.zh.md: 6b83300f0794af32906f7f28685c4c98eb4165a5

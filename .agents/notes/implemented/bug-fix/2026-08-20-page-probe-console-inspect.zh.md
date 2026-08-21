@@ -14,7 +14,7 @@ Status: implemented
 
 ## 备选方案
 
-**在有效捕获期间禁用 MAIN 世界探针。** 否决。`inspect-page` 在显式会话期间需要页面世界权限来观察 console 和 fetch/XHR 调用。[按需页面观察](2026-08-20-side-assistant-on-demand-page-observation.md)规定探针不进入未触碰的标签页，并在捕获之外保持休眠。
+**在有效捕获期间禁用 MAIN 世界探针。** 否决。`inspect-page` 在显式会话期间需要页面世界权限来观察 console 和 fetch/XHR 调用。[按需页面观察](2026-08-20-side-assistant-on-demand-page-observation.zh.md)规定探针不进入未触碰的标签页，并在捕获之外保持休眠。
 
 **吞掉转换错误并丢弃该 console 行。** 否决。`inspect-page` 会因此看不到触发失败的那条框架警告；若抛错发生在转发之前，原来的 `console.warn` 也不会执行。
 
@@ -30,5 +30,5 @@ Status: implemented
 
 ## 相关
 
-- [浏览器标签页扩展](../feature/2026-08-14-browser-tab-extension.md) — 拥有侧边助手和本渲染辅助函数所服务的 `inspect-page` 捕获路径。
-- [按需页面观察](2026-08-20-side-assistant-on-demand-page-observation.md) — 负责探针注入与捕获生命周期。
+- [浏览器标签页扩展](../feature/2026-08-14-browser-tab-extension.zh.md) — 拥有侧边助手和本渲染辅助函数所服务的 `inspect-page` 捕获路径。
+- [按需页面观察](2026-08-20-side-assistant-on-demand-page-observation.zh.md) — 负责探针注入与捕获生命周期。

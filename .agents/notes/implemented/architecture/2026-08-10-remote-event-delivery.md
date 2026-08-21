@@ -8,7 +8,7 @@ English | [中文](2026-08-10-remote-event-delivery.zh.md)
 
 [Typert Gateway targeted method calls](../../implemented/architecture/2026-08-02-typert-remote-method-calls.md) cover only the request/response shape and deliberately leave Session event streams and stateful interactions to separate designs. Every **one-way Host-to-consumer push** therefore still rides the legacy API Proxy.
 
-The Host owns a family of one-way events whose payloads are already JSON and whose emission never binds an AgentScope: `agent-preset/selected`, `browser/command`, `commands/change`, `credentials/updated`, `llm/adapters-updated`, and `settings/document-updated`. Before the shared carrier, reaching one UI subscriber took four hops: the Host cordis event, a hand-written `HostFrame` variant plus its zod branch in apiproxy, a hand-written bridge in client/runtime that re-emitted it as a Client cordis event, and finally the consumer's `ctx.on(...)`. Adding one such event edited five places (frame union, zod union, host-stream listener, client bridge, a duplicated Client-side `Events` declaration), and not one of them stated a new fact: the name, the payload type, and the emission point were all declared by the owner package's cordis `Events` merge.
+The Host owns a family of one-way events whose payloads are already JSON and whose emission never binds an AgentScope. The allowlist covers preset selection, addressed browser commands, command and credential invalidations, dynamic Cordis request/inspection traffic, and LLM/settings invalidations. Reaching one UI subscriber took four hops: the Host cordis event, a hand-written `HostFrame` variant plus its zod branch in apiproxy, a hand-written bridge in client/runtime that re-emitted it as a Client cordis event, and finally the consumer's `ctx.on(...)`. Adding one such event edited five places (frame union, zod union, host-stream listener, client bridge, a duplicated Client-side `Events` declaration), and not one of them stated a new fact: the name, the payload type, and the emission point were all declared by the owner package's cordis `Events` merge.
 
 That duplicated declaration is also **lossy**: the Client side restates it as `settings/changed(ns: string)`, flattening a branded type into bare `string` — the opposite of the Remote method contract, where a consumer type points at the business package's one canonical symbol.
 
@@ -22,9 +22,9 @@ The consumer Remote surface carries one one-way subscription verb, `ctx.remote.$
 - Event **signatures** get no second table. Each owner package moves its cordis `Events` declaration into its client-safe, type-only `./types` export, so both faces read the same declaration and `$on`'s listener type is `Events[Event]` itself. "Verbatim" then holds by construction rather than by proof.
 - Only cordis's *type shape* is borrowed, not its event system: delivery semantics, the subscription registry, and failure containment belong to Typert.
 
-When an `Events` entry's signature reaches a Host-only symbol (a Service, `Agent`, a Context), the answer is to **split the code until the entry lands cleanly in `./types`** — never a declaration half-left in `index.ts`, and never a structurally equivalent shadow type in `./types`. None of the six packages needs that here: their entries reach only client-safe values such as `SettingsNamespace`, `CredentialRef`, `SessionId`, and `BrowserCommand`. The agent-presets package keeps its exported `types.ts` dedicated to its client-safe event declaration.
+When an `Events` entry's signature reaches a Host-only symbol (a Service, `Agent`, a Context), the answer is to **split the code until the entry lands cleanly in `./types`** — never a declaration half-left in `index.ts`, and never a structurally equivalent shadow type in `./types`. The allowlisted entries reach only client-safe values such as `SettingsNamespace`, `CredentialRef`, `SessionId`, `BrowserCommand`, and the dynamic Cordis request vocabulary.
 
-All six events ride this path. The first five dedicated `HostFrame` variants or Client aliases are gone, while the browser-extension provider subscribes directly to `browser/command`. Model consumers subscribe directly to both owner inputs, `llm/adapters-updated` and `settings/document-updated`; preset-derived consumers subscribe to `agent-preset/selected`. Frames that actually project or deduplicate data stay dedicated: `host/workspace-changed`/`-removed`/`host/archived-sessions-changed` (view derivation plus per-connection dedup state), and `host/session-added`/`-removed`/`host/session-status`/`host/agent-error` (live-object projection or frame-time derived fields).
+Every allowlisted event rides this path. Model consumers subscribe directly to `llm/adapters-updated` and `settings/document-updated`; preset-derived consumers subscribe to `agent-preset/selected`; the browser extension receives addressed `browser/command` payloads; dynamic Cordis consumers receive request and inspection traffic. Frames that project or deduplicate data stay dedicated: `host/workspace-changed`/`-removed`/`host/archived-sessions-changed` (view derivation plus per-connection dedup state), and `host/session-added`/`-removed`/`host/session-status`/`host/agent-error` (live-object projection or frame-time derived fields).
 
 `skills/change`, `tools/change`, and `system-prompt/change` have the same shape but **no consumer today**; under "require a current owner and need" they stay out of the allowlist and are recorded here only as the extension seat.
 
@@ -56,7 +56,7 @@ $on<Event extends TypertRemoteEvent>(event: Event, listener: Events[Event]): () 
 
 `Events` resolves per program: the full Host vocabulary in the Host program, whatever the Client face can see in the Client program. The same predicate therefore holds on both sides without dragging Host declarations into the Client.
 
-**The surface separates the consumer verb from the carrier handoff**: consumers subscribe with `$on`, and whoever owns the Host frame sink hands each decoded frame over with `$dispatch`. It cannot be a module-level function reaching across Client plugins — the client bundle purity gate (`packages/client/tsdown.client.ts`) admits value imports only from `CLIENT_EXTERNALS`, the `INLINE_SAFE` wire layer, and generated `/remote` contributions, and inlining around it would copy `ClientRemoteService` into the runtime bundle, making `instanceof` permanently false. A cordis service method is the collaboration shape that gate prescribes:
+**The surface separates the consumer verb from the carrier handoff**: consumers subscribe with `$on`, and whoever owns the Host frame sink hands each decoded frame over with `$dispatch`. It cannot be a module-level function reaching across Client plugins — the client bundle purity gate (`packages/client/tsdown.client.ts`) admits value imports only from the implicit `PLATFORM_MODULES` plus `PRELOADED_CLIENT_EXTERNALS` baseline, the package's `dsh.client.external` requests, the `INLINE_SAFE` wire layer, and generated `/remote` contributions. Inlining around it would copy `ClientRemoteService` into the runtime bundle, making `instanceof` permanently false. A cordis service method is the collaboration shape that gate prescribes:
 
 ```ts ignore-check
 $dispatch(event: string, args: readonly unknown[]): void
@@ -76,7 +76,13 @@ export const API_REMOTE_FORWARDED_EVENTS = [
   'agent-preset/selected',
   'browser/command',
   'commands/change',
-  'credentials/updated',
+  'credentials/reference-updated',
+  'cordis/request-run',
+  'cordis/request-run-resolved',
+  'cordis/dynamic-package',
+  'cordis/dynamic-retract',
+  'cordis/inspect-query',
+  'cordis/inspect-query-resolved',
   'llm/adapters-updated',
   'settings/document-updated',
 ] as const
@@ -129,13 +135,13 @@ The few Client-owned symbols are therefore **mirrored** on the test side (`scaff
 |---|---|
 | `dsh-typert-protocol` | `src/types.ts` gains `TypertForwardableEvent`, `TypertRemoteEventSelection`, and `TypertRemoteEvent`; `TypertClientRemote` gains `$on` and `$dispatch`. Types only, no runtime |
 | `api/gateway` Client half | `ClientRemoteService` implements `$on` (subscriptions addressed by registration, `ctx.effect` ownership for the calling fiber) and `$dispatch` (snapshot delivery in registration order, containing a listener that throws or rejects) |
-| `api/remotes` | `src/remote-events.ts` owns the allowlist value and `src/types.ts` owns its type projection and selection seat; both belong to both compilation faces. The Host face imports all six owner `./types` declarations for the shape assertion, and the Client half re-exports their client-safe types plus `@deepseek-ai/dsh-api-gateway/client` |
+| `api/remotes` | New `src/remote-events.ts` (the allowlist value) and `src/types.ts` (type projection, selection seat), both listed in both faces' `files`; a `./types` export with `lib/types/**/*.js` added to `files`; the Host face adds the shape assertion and `import type {}` for the five owner `./types`; the Client half re-exports those five plus `@deepseek-ai/dsh-api-gateway/client` |
 | Root `tsconfig.base.json` | Client-safe `paths` entries for settings, credentials, llm, agent-presets, and api-remotes types point at the **source** plane |
 | `dsh-commands` / `dsh-settings` / `dsh-credentials` / `dsh-llm` / `dsh-agent-presets` | Each forwarded `interface Events` member lives in the owner's client-safe `./types`; agent-presets moves its previous domain vocabulary to `preset.ts` so the exported file itself remains `types.ts` |
 | `host/apiproxy` | `HostFrame` gains `host/remote-event` and loses the five dedicated passthrough or invalidation variants with their zod branches; `events.host()` subscribes by allowlist and validates through `assertJsonArgs` |
 | `dsh-session` | `src/types.ts` re-exports `JsonValue` so wire contract files can use the client-safe subpath |
-| `client/runtime` | The five Client-event bridge branches collapse into `ctx.remote.$dispatch(frame.event, frame.args)`, adding a `remote` injection and deleting their duplicated `Events` declarations |
-| Eight consumers | ui-commands / ui-model-selection / ui-settings-models / ui-settings-general / ui-permission / ui-agent-preset / ui-skill / client-browser-extension subscribe through `ctx.remote.$on(...)`, following `ui-goal`'s precedent for the type-only facade import and the `'remote'` injection |
+| `client/runtime` | Legacy Client-event bridge branches collapse into `ctx.remote.$dispatch(frame.event, frame.args)`, adding a `remote` injection and deleting duplicated `Events` declarations |
+| Consumers | UI invalidation consumers, the browser extension, and dynamic Cordis consumers subscribe through `ctx.remote.$on(...)` using the type-only facade import and the `'remote'` injection |
 | `client/connection` | The fixture's `emitHost` produces `host/remote-event` |
 | `apps/web/tests` + `apps/cli` | Client symbols mirrored on the test side (see above); `apps/cli/tsconfig.json` drops its 15 Client project references |
 
@@ -163,7 +169,7 @@ What pins this behavior:
 - `$on`'s disposer belongs to the calling fiber, and two registrations of one function object retire independently — a table keyed on listener identity would collapse them, so subscriptions are addressed by registration.
 - Delivery contains a listener that throws AND one that rejects a returned promise: the declared return is `void`, so nobody awaits an async listener, and its rejection would otherwise escape this containment entirely. Delivery iterates a snapshot, so subscribing or disposing mid-frame cannot change who receives that frame.
 - `assertJsonArgs` is unit-tested directly rather than by driving a malformed emit through the event bus: a typed `ctx.emit` cannot construct one, since every allowlisted event has a statically JSON-safe payload.
-- The five dedicated `HostFrame` variants, five Client-side aliases, and their bridge branches are absent. The model directories observe both owner inputs, command, skill, and session-row consumers observe the preset owner's committed-selection event, and the browser extension receives addressed `browser/command` payloads.
+- Dedicated per-event `HostFrame` variants, Client-side aliases, and bridge branches are absent. Model directories observe owner invalidations, command/skill/session-row consumers observe preset selection, the browser extension receives addressed commands, and dynamic Cordis consumers receive their request traffic.
 
 ## Consequences
 

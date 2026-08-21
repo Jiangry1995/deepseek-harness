@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-31-third-party-memory-mcp-examples.md
 2026-07-31-third-party-memory-mcp-examples.md: 6de7240bb7dc6c8329db54cd2ac32d46f6519c92
-2026-07-31-third-party-memory-mcp-examples.zh.md: 1a7477d918f273d33cf06e70b4a2ee5fbce8dcb7
+2026-07-31-third-party-memory-mcp-examples.zh.md: 1db41ac88dd739f3620be45b4332026bb22857b5

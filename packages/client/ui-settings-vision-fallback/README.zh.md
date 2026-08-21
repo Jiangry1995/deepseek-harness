@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-[`@deepseek-ai/dsh-llm-vision-fallback`](../../llm/llm-vision-fallback/README.md) 的 Web 设置配套包。它向 `settings.plugins.tab` 贡献本地化的**自动识图**标签，绑定 `llm-vision-fallback` settings namespace，并且只在标签挂载后才读取 `llm.models`。
+[`@deepseek-ai/dsh-llm-vision-fallback`](../../llm/llm-vision-fallback/README.zh.md) 的 Web 设置配套包。它向 `settings.plugins.tab` 贡献本地化的**自动识图**标签，绑定 `llm-vision-fallback` settings namespace，并且只在标签挂载后才读取 `llm.models`。
 
 提供方和模型选择器只展示目录元数据明确包含 `image` 的已注册确切模型。API Key、端点、自定义提供方和模型 profile 修改继续归“模型”页面所有；本标签只负责辅助模型选择、最大输出 Token、超时和转译提示词。目录局部失败时保留成功提供方，整体失败有重试操作，无效数字或残缺路由草稿会阻止保存，被拒写入会保留草稿。Host 推送的 `llm/adapters-updated`、`settings/document-updated` 和 `connection/reset` 只刷新已经加载过的目录，不会让插件激活产生网络读取。改模型 profile（含“支持图片输入”开关）不会重新注册适配器路由，所以要靠文档更新事件才能和“模型”页保持同步。
 

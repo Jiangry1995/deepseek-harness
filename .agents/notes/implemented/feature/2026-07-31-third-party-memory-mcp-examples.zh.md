@@ -77,8 +77,8 @@ Status: implemented
 
 通用方案取代了早期针对特定提供方的改动。未来出现提供方版本偏移时，只需更新并重新验证一份小型示例的固定版本，不必向 DSH 添加运行时分支。
 
-本决策拒绝把第三方记忆 MCP 服务器做成官方 DSH 产品接口。它并不拒绝第一方磁盘 markdown 存储；该能力由[第一方文件记忆](2026-08-18-first-party-file-memory.md)负责。
+本决策拒绝把第三方记忆 MCP 服务器做成官方 DSH 产品接口。它并不拒绝第一方磁盘 markdown 存储；该能力由[第一方文件记忆](2026-08-18-first-party-file-memory.zh.md)负责。
 
 ## 相关
 
-[第一方文件记忆](2026-08-18-first-party-file-memory.md)
+[第一方文件记忆](2026-08-18-first-party-file-memory.zh.md)

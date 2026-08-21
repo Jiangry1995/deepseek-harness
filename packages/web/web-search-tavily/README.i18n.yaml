@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/web/web-search-tavily/README.md
 README.md: 90be7016868b9e84558524364b1f27386be06042
-README.zh.md: c2c7f380ab8fb711190806769d552db50a0f61e9
+README.zh.md: d4a98f5b4013a7314c8acf35fcbe1282129379d9

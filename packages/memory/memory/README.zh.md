@@ -4,7 +4,7 @@
 
 **`MemoryStore`**（`ctx.memory`）拥有本机 markdown 记忆树：用户级根目录，以及 agent（智能体）工作目录下可选的项目级目录。每个相对路径都解析在所选根之内。水印、锁文件和临时同级文件对工具不可见。
 
-本包是文件存储。面向模型的工具、提示词注入和抽取/巩固任务位于 [`@deepseek-ai/dsh-tool-memory`](../tool-memory/README.md)。
+本包是文件存储。面向模型的工具、提示词注入和抽取/巩固任务位于 [`@deepseek-ai/dsh-tool-memory`](../tool-memory/README.zh.md)。
 
 ## 配置
 

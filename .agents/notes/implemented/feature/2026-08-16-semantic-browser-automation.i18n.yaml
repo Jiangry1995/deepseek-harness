@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-16-semantic-browser-automation.md
 2026-08-16-semantic-browser-automation.md: c959e3895bd8cf61ac9e9b5933de1d90f70ff1e0
-2026-08-16-semantic-browser-automation.zh.md: 15be174183c7627c3845a52b708292559976ec88
+2026-08-16-semantic-browser-automation.zh.md: 963fa7b76d5906e13f5c4ff7a5ae379eb67675e0

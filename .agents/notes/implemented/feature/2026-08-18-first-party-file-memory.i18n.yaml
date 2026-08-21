@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-18-first-party-file-memory.md
 2026-08-18-first-party-file-memory.md: 6f781d1664fee64ac3ce8965a1ad32cfe3faac86
-2026-08-18-first-party-file-memory.zh.md: 27cb77e24b129be9b9d61b0f16eb79d49912a484
+2026-08-18-first-party-file-memory.zh.md: e3c48b3a33747a64343910e2a973039e064317fa

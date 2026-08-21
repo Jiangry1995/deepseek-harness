@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-`browser_wait_for` 可以在页面内等待最长 30 秒。Host 已经会把 wait-page 请求保留得比 `requestTimeoutMs` 更久，但 Web Client 页面桥忽略 `operation.timeoutMs`，只用租约里的超时减去 1000ms 余量。因此一次 30 秒的「文本消失」等待大约 14 秒就会以 `browser extension bridge response timed out` 结束，并作为 `BROWSER_API_FAILED` 完成，而页内等待仍在进行。聊天发送与不完整等待的恢复记录在[聊天发送从快照控件发出](2026-08-19-browser-composer-send-and-wait-recovery.md)。
+`browser_wait_for` 可以在页面内等待最长 30 秒。Host 已经会把 wait-page 请求保留得比 `requestTimeoutMs` 更久，但 Web Client 页面桥忽略 `operation.timeoutMs`，只用租约里的超时减去 1000ms 余量。因此一次 30 秒的「文本消失」等待大约 14 秒就会以 `browser extension bridge response timed out` 结束，并作为 `BROWSER_API_FAILED` 完成，而页内等待仍在进行。聊天发送与不完整等待的恢复记录在[聊天发送从快照控件发出](2026-08-19-browser-composer-send-and-wait-recovery.zh.md)。
 
 ## 决策
 

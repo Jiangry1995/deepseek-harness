@@ -58,7 +58,7 @@ class HangAdapter extends LlmAdapter {
     if (signal === undefined) throw new Error('expected signal')
     await new Promise<never>((_resolve, reject) => {
       const fail = (): void => {
-        reject(signal.reason)
+        reject(new Error('memory test adapter aborted', { cause: signal.reason }))
       }
       if (signal.aborted) {
         fail()

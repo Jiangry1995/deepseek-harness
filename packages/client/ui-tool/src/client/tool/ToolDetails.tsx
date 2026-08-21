@@ -10,22 +10,16 @@ import { webCardModel } from './models/web-card-model.ts'
 import { ToolResultImages } from './components/ToolResultImages.tsx'
 import css from './ToolDetails.module.css'
 
-/** Pure details-body inputs; framework session seats stay at the slot boundary. */
-interface ToolDetailsContentProps {
-  block: ToolDetailsProps['block']
-  cwd?: ToolDetailsProps['cwd']
-  loadImage?: ToolDetailsProps['loadImage']
-  t: ToolDetailsProps['t']
-}
-
 /**
  * Render the selected Tool call's structured output when its presentation
- * intent is known, otherwise preserve the flattened result text and any
- * image-block thumbnails.
- * @param props - selected call slice, workspace root, image loader, and locale seat.
+ * intent is known, otherwise preserve flattened text and image-block previews.
+ * @param props - selected call slice, workspace root, host description, image loader, and locale seat.
  * @returns the details output body.
  */
-export function ToolDetails({ block, cwd, loadImage, t }: ToolDetailsContentProps) {
+export function ToolDetails({
+  block, cwd, renderImages, useHostDescription, t,
+}: Pick<ToolDetailsProps, 'block' | 'cwd' | 'renderImages' | 'useHostDescription' | 't'>) {
+  const home = useHostDescription(description => description?.home)
   const terminal = terminalCardModel(block, cwd)
   if (terminal !== null) {
     return (
@@ -37,7 +31,7 @@ export function ToolDetails({ block, cwd, loadImage, t }: ToolDetailsContentProp
       </>
     )
   }
-  const read = readCardModel(block, cwd)
+  const read = readCardModel(block, cwd, home)
   if (read !== null) return <ReadBlock {...read} className={css.read} />
   const diff = diffCardModel(block)
   if (diff !== null) return <DiffBlock {...diff.card} className={css.cardBody} />
@@ -65,8 +59,8 @@ export function ToolDetails({ block, cwd, loadImage, t }: ToolDetailsContentProp
   const text = resultText(block)
   return (
     <>
-      {loadImage !== undefined && images.length > 0 ? (
-        <ToolResultImages images={images} load={loadImage} t={t} className={css.resultImages} />
+      {images.length > 0 ? (
+        <ToolResultImages images={images} renderImages={renderImages} className={css.resultImages} />
       ) : null}
       {text !== '' || images.length === 0 ? (
         <pre className={css.code} data-error={block.isError || undefined}>

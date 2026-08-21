@@ -12,7 +12,7 @@
 | `@deepseek-ai/dsh-client-browser-extension` | 连接 Web Client 与 MV3 扩展的 Service Provider |
 | `@deepseek-ai/dsh-tool-browser` | 暴露面向模型的浏览器工具的 Consumer |
 
-[浏览器标签页 Agent Note](../../../.agents/notes/implemented/feature/2026-08-14-browser-tab-extension.md)记录跨进程归属决策；[页面控制 Agent Note](../../../.agents/notes/implemented/feature/2026-08-16-browser-side-assistant-page-control.md)记录文档绑定交互和伴随程序生命周期决策；[语义自动化 Agent Note](../../../.agents/notes/implemented/feature/2026-08-16-semantic-browser-automation.md)记录文档身份、等待、滚动、聚焦和有限键盘操作。
+[浏览器标签页 Agent Note](../../../.agents/notes/implemented/feature/2026-08-14-browser-tab-extension.zh.md)记录跨进程归属决策；[页面控制 Agent Note](../../../.agents/notes/implemented/feature/2026-08-16-browser-side-assistant-page-control.zh.md)记录文档绑定交互和伴随程序生命周期决策；[语义自动化 Agent Note](../../../.agents/notes/implemented/feature/2026-08-16-semantic-browser-automation.zh.md)记录文档身份、等待、滚动、聚焦和有限键盘操作。
 
 ## 服务行为
 

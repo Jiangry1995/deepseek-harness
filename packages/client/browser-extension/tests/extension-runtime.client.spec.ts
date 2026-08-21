@@ -533,7 +533,7 @@ describe('Chromium tabs adapter', () => {
     }))
     tabs.sendMessage.mockResolvedValue({ ok: true, content: pageContent({ text: 'Tab 44' }) })
 
-    await executeBridgeOperation(tabs as never, scriptingApi() as never, { kind: 'read-page', tabId: 44 })
+    await executeBridgeOperation(tabs, scriptingApi(), { kind: 'read-page', tabId: 44 })
     await expect(answerBridgeRequest(tabs as never, scriptingApi() as never, request({
       kind: 'wait-page',
       pageId,
@@ -562,9 +562,9 @@ describe('Chromium tabs adapter', () => {
       .mockResolvedValueOnce({ ok: true, content: pageContent({ text: 'Tab 44' }) })
       .mockResolvedValueOnce({ ok: true, receipt: { pageId, ref: 'e2', action: 'clicked' } })
 
-    await executeBridgeOperation(tabs as never, scriptingApi() as never, { kind: 'read-page', tabId: 44 })
+    await executeBridgeOperation(tabs, scriptingApi(), { kind: 'read-page', tabId: 44 })
     rememberFocusedTab(12)
-    await executeBridgeOperation(tabs as never, scriptingApi() as never, {
+    await executeBridgeOperation(tabs, scriptingApi(), {
       kind: 'click-page-element', pageId, ref: 'e2',
     })
 

@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-07-29-atomic-web-image-admission.md
 2026-07-29-atomic-web-image-admission.md: e96e6e1f66ecd8fe52957ed213c7c1f99a243786
-2026-07-29-atomic-web-image-admission.zh.md: 9e382412bb6d52edaff877c42b7b37c02ee8ecc9
+2026-07-29-atomic-web-image-admission.zh.md: 4eb64c42e84ffef511cd072b74d6299d7510eda6

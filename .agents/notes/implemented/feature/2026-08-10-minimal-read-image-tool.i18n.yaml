@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-10-minimal-read-image-tool.md
 2026-08-10-minimal-read-image-tool.md: 277169e00926bf8a4f0968d3b8b21c6b77982e19
-2026-08-10-minimal-read-image-tool.zh.md: fe782ca8662874c383b2c8fa0d66525002e67c75
+2026-08-10-minimal-read-image-tool.zh.md: 047b3a3e7995969df63323be18adb5649abdf9ba

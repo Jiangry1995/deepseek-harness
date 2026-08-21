@@ -355,11 +355,13 @@ export class SidePanelController {
         try {
           await this.ensureHarness(this.origin)
         } catch (startupError) {
+          // oxlint-disable-next-line typescript/no-unnecessary-condition -- native startup can dispose or supersede this controller.
           if (this.disposed || generation !== this.probeGeneration) return
           this.elements.offlineDetail.textContent = `${connectionErrorMessage(error)} ${connectionErrorMessage(startupError)}`
           this.setState('offline')
           return
         }
+        // oxlint-disable-next-line typescript/no-unnecessary-condition -- native startup can dispose or supersede this controller.
         if (this.disposed || generation !== this.probeGeneration) return
         await this.connect(false)
         return
@@ -590,6 +592,7 @@ export class SidePanelController {
       if (generation === this.activeTabGeneration) this.hideActiveTab()
       return
     }
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- the awaited tab query can dispose or supersede this controller.
     if (this.disposed || generation !== this.activeTabGeneration) return
     await this.renderActiveTab(tab, generation)
   }
@@ -606,6 +609,7 @@ export class SidePanelController {
     } catch {
       return
     }
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- the awaited tab query can dispose or supersede this controller.
     if (this.disposed || generation !== this.activeTabGeneration) return
     await this.renderActiveTab(tab, generation)
   }
@@ -641,6 +645,7 @@ export class SidePanelController {
     } catch {
       granted = false
     }
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- permission I/O can dispose or retarget the controller.
     if (this.disposed || generation !== this.activeTabGeneration || this.accessOrigin === undefined) return
     grant.hidden = granted
   }

@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-16-browser-side-assistant-page-control.md
 2026-08-16-browser-side-assistant-page-control.md: ddba7fc86aa5104b49920b514255f4f5075e5409
-2026-08-16-browser-side-assistant-page-control.zh.md: 155d78925a54cd2a7f34db97a75c21237c1a6934
+2026-08-16-browser-side-assistant-page-control.zh.md: 09f8835d2a2082f5d332029c729e24e4e633ad72

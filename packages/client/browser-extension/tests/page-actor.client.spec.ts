@@ -169,8 +169,10 @@ describe('document-bound page actions', () => {
     const send = vi.fn()
     const observed: number[] = []
     textarea.addEventListener('keydown', (event) => {
-      observed.push(event.keyCode, event.which)
-      if (event.keyCode === 13 && !event.shiftKey) {
+      const keyCode: number = Reflect.get(event, 'keyCode')
+      const which: number = Reflect.get(event, 'which')
+      observed.push(keyCode, which)
+      if (keyCode === 13 && !event.shiftKey) {
         send()
         event.preventDefault()
       }

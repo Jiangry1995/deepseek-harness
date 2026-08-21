@@ -10,7 +10,9 @@ English | [中文](2026-08-20-tool-result-image-preview.zh.md)
 
 ## Decision
 
-The generic Tool row and the details Output section render `type: 'image'` content as the same session-authorized thumbnails the chat history uses. `resultImages` extracts attachment refs from the frozen result; `resultText` omits image blocks so Output is the envelope, not a JSON dump. `ToolRow` places the gallery outside the disclosure, as a sibling of the IN/OUT body, so collapsing hides only the envelope and a 240px long-edge preview is not clipped by the 150px text cap. `ToolDetails` puts the gallery above the envelope. Bytes resolve through `loadImage`, which the chat node owner already had and which the details inject now forwards from `conversation.resolveImage`.
+The generic Tool row and the details Output section render `type: 'image'` content as the same session-authorized thumbnails the chat history uses. `resultImages` extracts attachment refs from the frozen result; `resultText` omits image blocks so Output is the envelope, not a JSON dump. `ToolRow` places the gallery outside the disclosure, as a sibling of the IN/OUT body, so collapsing hides only the envelope and a 240px long-edge preview is not clipped by the 150px text cap. `ToolDetails` puts the gallery above the envelope.
+
+Image presentation follows the Client slot architecture. The Chat Node owner supplies `renderMessageImages`, which the generic row receives as `renderImages` and routes through `conversation.message.images`. The details panel declares `conversation.details.images`, combines that slot with its session-authorized `loadImage`, and supplies the resulting `renderImages` callback to `ToolDetails`. `ui-attachment` fills both image slots with the same `MessageImages` component, so rows, details, and message history share loading, labels, sizing, and lightbox behavior without importing presentation components across plugins.
 
 `read_image` classifies as the read-family row titled `Read image`, with `file_path` as an openable host link. There is no new `card:` tag and no keyed `read_image` toolview: any tool whose settled content includes an `ImageBlock` gets the preview, and `read_image` keeps `presentCall` `{ card: 'generic', kind: 'read' }`.
 
@@ -24,11 +26,11 @@ The generic Tool row and the details Output section render `type: 'image'` conte
 
 ## Consequences
 
-A successful `read_image` row shows the screenshot under the title while the metadata envelope stays collapsed by default. Expanding reveals the envelope; collapsing hides it and keeps the thumbnail. Opening the call in details also shows the screenshot. A missing `loadImage` callback leaves the envelope without a thumbnail rather than fetching bytes from an unauthorized path. JSON dumps of image blocks no longer appear in Output.
+A successful `read_image` row shows the screenshot under the title while the metadata envelope stays collapsed by default. Expanding reveals the envelope; collapsing hides it and keeps the thumbnail. Opening the call in details also shows the screenshot. An unfilled attachment presentation slot leaves the envelope without a thumbnail; image bytes remain behind the conversation-owned session authorization. JSON dumps of image blocks no longer appear in Output.
 
 ## Testing
 
-`packages/client/ui-tool/tests/tool-row.client.spec.tsx` pins `resultText` skipping image blocks, `resultImages` collecting attachments, and the `read_image` row title/path. `packages/client/ui-tool/tests/tool-image-preview.client.spec.tsx` pins the collapsed-row thumbnail and lightbox, the envelope staying inside the disclosure, the GenericToolCard `read_image` path, and the details Output gallery. `packages/client/ui-conversation/tests/apply-inject.client.spec.tsx` pins the details inject forwarding `loadImage`.
+`packages/client/ui-tool/tests/tool-row.client.spec.tsx` pins `resultText` skipping image blocks, `resultImages` collecting attachments, and the `read_image` row title/path. `packages/client/ui-tool/tests/tool-image-preview.client.spec.tsx` pins row/details slot routing, the envelope staying inside the disclosure, and the GenericToolCard `read_image` path. `packages/client/ui-attachment/tests/message-image.client.spec.tsx` pins thumbnail loading and the lightbox, while `packages/client/ui-attachment/tests/plugin.client.spec.ts` pins both image-slot registrations.
 
 ## Related
 

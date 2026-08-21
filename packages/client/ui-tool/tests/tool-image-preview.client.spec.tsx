@@ -9,6 +9,7 @@ import { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
+import type { RenderMessageImages } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
 import { ToolResultImages } from '../src/client/tool/components/ToolResultImages.tsx'
 import { ToolRow } from '../src/client/tool/components/ToolRow.tsx'
@@ -41,19 +42,32 @@ const imageResult = (over?: Partial<ToolResultNode>): ToolResultNode => ({
   isError: false, callView: null, resultView: null, subCalls: [], ...over,
 })
 
+/** Render a deterministic attachment-slot probe without importing its presentation plugin. */
+function imageRenderer(spy?: (owner: Parameters<RenderMessageImages>[0]) => void): RenderMessageImages {
+  return (owner) => {
+    spy?.(owner)
+    return (
+      <div data-testid="image-gallery" data-align={owner.align}>
+        {owner.images.map(image => <span key={image.attachment.attachmentId}>{image.attachment.name}</span>)}
+      </div>
+    )
+  }
+}
+
 describe('ToolResultImages', () => {
   it('renders nothing when the result carried no images', () => {
+    const renderImages = vi.fn(imageRenderer())
     const view = render(
-      <ToolResultImages images={[]} load={() => Promise.resolve('blob:empty')} t={t} />,
+      <ToolResultImages images={[]} renderImages={renderImages} />,
     )
-    expect(view.container.querySelector('img')).toBeNull()
+    expect(renderImages).not.toHaveBeenCalled()
     expect(view.container.textContent).toBe('')
   })
 })
 
 describe('tool row image preview', () => {
-  it('shows the thumbnail while collapsed and keeps the envelope inside the disclosure', async () => {
-    const load = vi.fn(() => Promise.resolve('blob:shot'))
+  it('shows the attachment slot while collapsed and keeps the envelope inside the disclosure', () => {
+    const renderImages = vi.fn(imageRenderer())
     const view = render(
       <ToolRow
         t={t}
@@ -66,23 +80,18 @@ describe('tool row image preview', () => {
         output="<path>shot.png</path>"
         state="ok"
         images={[attachment]}
-        loadImage={load}
+        renderImages={renderImages}
       />,
     )
-    const frame = await view.findByRole('button', { name: 'shot.png，点击查看原图' })
-    expect(load).toHaveBeenCalledWith(attachment)
-    await view.findByAltText('shot.png')
-    expect(view.queryByText(/<path>shot.png<\/path>/)).toBeNull()
-    fireEvent.click(frame)
-    expect(view.getByRole('dialog', { name: '原图预览' })).toBeTruthy()
-    fireEvent.click(view.getByRole('button', { name: '关闭原图预览' }))
-    expect(view.queryByRole('dialog')).toBeNull()
+    expect(renderImages).toHaveBeenCalledWith({ images: [{ attachment }], align: 'start' })
+    expect(view.getByTestId('image-gallery')).toBeTruthy()
+    expect(view.getAllByText('shot.png')).toHaveLength(2)
     expect(view.queryByText(/<path>shot.png<\/path>/)).toBeNull()
     fireEvent.click(view.getByRole('button', { name: /Read image/ }))
     expect(view.getByText(/<path>shot.png<\/path>/)).toBeTruthy()
     fireEvent.click(view.getByRole('button', { name: /Read image/ }))
     expect(view.queryByText(/<path>shot.png<\/path>/)).toBeNull()
-    expect(view.getByAltText('shot.png')).toBeTruthy()
+    expect(view.getByTestId('image-gallery')).toBeTruthy()
   })
 
   it('stays collapsed without a loader even when image attachments are present', () => {
@@ -99,28 +108,27 @@ describe('tool row image preview', () => {
       />,
     )
     expect(view.queryByRole('button')).toBeNull()
-    expect(view.container.querySelector('img')).toBeNull()
+    expect(view.queryByTestId('image-gallery')).toBeNull()
   })
 })
 
 describe('GenericToolCard read_image', () => {
-  it('titles the row Read image, links the path, and previews the result image', async () => {
+  it('titles the row Read image, links the path, and previews the result image', () => {
     const openFile = vi.fn()
-    const loadImage = vi.fn(() => Promise.resolve('blob:card'))
     const view = render(
       <GenericToolCard
         callId="c1"
         toolName="read_image"
         block={imageResult()}
         openFile={openFile}
-        loadImage={loadImage}
+        renderImages={imageRenderer()}
         t={t}
       />,
     )
     expect(view.getByText('Read image')).toBeTruthy()
-    fireEvent.click(view.getByText('shot.png'))
+    fireEvent.click(view.getByRole('button', { name: 'shot.png' }))
     expect(openFile).toHaveBeenCalledWith('shot.png')
-    await view.findByAltText('shot.png')
+    expect(view.getByTestId('image-gallery')).toBeTruthy()
     expect(view.queryByText(/<type>image<\/type>/)).toBeNull()
     fireEvent.click(view.getByRole('button', { name: /Read image/ }))
     expect(view.getByText(/<type>image<\/type>/)).toBeTruthy()
@@ -129,15 +137,16 @@ describe('GenericToolCard read_image', () => {
 })
 
 describe('ToolDetails image preview', () => {
-  it('renders the thumbnail above the metadata envelope', async () => {
+  it('renders the attachment slot above the metadata envelope', () => {
     const view = render(
       <ToolDetails
         block={imageResult()}
-        loadImage={() => Promise.resolve('blob:details')}
+        renderImages={imageRenderer()}
+        useHostDescription={selector => selector({ home: '/home/user' } as never)}
         t={t}
       />,
     )
-    await view.findByAltText('shot.png')
+    expect(view.getByTestId('image-gallery')).toBeTruthy()
     expect(view.getByText(/<type>image<\/type>/)).toBeTruthy()
     expect(view.queryByText(/"attachmentId"/)).toBeNull()
   })

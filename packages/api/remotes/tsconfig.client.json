@@ -27,6 +27,12 @@
       "path": "../../web/browser"
     },
     {
+      "path": "../../context/file-reference"
+    },
+    {
+      "path": "../../context/session-reference"
+    },
+    {
       "path": "../../extensions/cordis-host-runner"
     },
     {

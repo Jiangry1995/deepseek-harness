@@ -70,7 +70,7 @@ describe('web-networking command and restrict', () => {
     const { ctx, agent, session } = await harness()
     const signal = new AbortController().signal
 
-    const off = await ctx.commands.execute(agent, '/web off', signal)
+    const off = await ctx.commands.execute(agent, '/web off', [], signal)
     expect(off?.result).toEqual({
       kind: 'success',
       text: 'Web tools off. Use /web to re-enable search and fetch.',
@@ -79,7 +79,7 @@ describe('web-networking command and restrict', () => {
     // Visibility is scoped through the agent key (same view the model sees).
     expect(ctx.tools.schemas(agent).map(tool => tool.name)).toEqual([])
 
-    const on = await ctx.commands.execute(agent, '/web', signal)
+    const on = await ctx.commands.execute(agent, '/web', [], signal)
     expect(on?.result).toEqual({
       kind: 'success',
       text: 'Web tools on. Use /web off to disable search and fetch.',
@@ -90,7 +90,7 @@ describe('web-networking command and restrict', () => {
   it('masks only the tools that exist', async () => {
     const { agent, ctx } = await harness(['web_search'])
     const signal = new AbortController().signal
-    await ctx.commands.execute(agent, '/web off', signal)
+    await ctx.commands.execute(agent, '/web off', [], signal)
     expect(ctx.tools.schemas(agent).map(tool => tool.name)).toEqual([])
   })
 
@@ -99,10 +99,10 @@ describe('web-networking command and restrict', () => {
     const signal = new AbortController().signal
 
     expect(ctx.tools.schemas(agent).map(tool => tool.name).sort()).toEqual(['web_fetch', 'web_search'])
-    await ctx.commands.execute(agent, '/web off', signal)
+    await ctx.commands.execute(agent, '/web off', [], signal)
     expect(ctx.tools.schemas(agent).map(tool => tool.name)).toEqual([])
 
-    await ctx.commands.execute(agent, '/web', signal)
+    await ctx.commands.execute(agent, '/web', [], signal)
     expect(ctx.tools.schemas(agent).map(tool => tool.name).sort()).toEqual(['web_fetch', 'web_search'])
   })
 
@@ -110,7 +110,7 @@ describe('web-networking command and restrict', () => {
     const { agent, ctx, session } = await harness()
     const append = vi.spyOn(session, 'append')
     const signal = new AbortController().signal
-    const result = await ctx.commands.execute(agent, '/web', signal)
+    const result = await ctx.commands.execute(agent, '/web', [], signal)
     expect(result?.result).toMatchObject({ kind: 'success', text: 'Web tools already on.' })
     expect(append).not.toHaveBeenCalledWith('web/networking', expect.anything())
   })

@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/web/web-search-firecrawl/README.md
 README.md: 81bcf929c674465569c5d3bfaf28dfcbb0c4c836
-README.zh.md: 9c6478b065fd9740505e9c1821bfe63346abcd72
+README.zh.md: b3c92b5498227d8e2f6fd8e30e49b9869b3dd210

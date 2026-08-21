@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-20-side-assistant-on-demand-page-observation.md
 2026-08-20-side-assistant-on-demand-page-observation.md: 16f7342c11479c9355f1d28aff8a2028443a7c05
-2026-08-20-side-assistant-on-demand-page-observation.zh.md: f849132e1c33de31b0fa982a618853686ab55dce
+2026-08-20-side-assistant-on-demand-page-observation.zh.md: 957374b984b4bc60e579815b4070cfdcdd110f5c

@@ -22,8 +22,10 @@ interface PendingBridgeRequest {
  * @returns chrome-extension origin, or undefined for a top-level loopback tab.
  */
 export function parentBridgeOrigin(target: Window): string | undefined {
-  if (target.parent === undefined || target.parent === target) return undefined
-  const origin = target.location.ancestorOrigins?.[0]
+  if (target.parent === target) return undefined
+  const origins: unknown = Reflect.get(target.location, 'ancestorOrigins')
+  if (typeof origins !== 'object' || origins === null) return undefined
+  const origin: unknown = Reflect.get(origins, '0')
   return typeof origin === 'string' && origin !== '' ? origin : undefined
 }
 

@@ -74,7 +74,7 @@ function isDisabled(element: HTMLElement): boolean {
 
 /** Return whether one page element currently rejects editing. */
 function isReadOnly(element: HTMLElement): boolean {
-  return ('readOnly' in element && Boolean((element as HTMLInputElement).readOnly))
+  return ('readOnly' in element && Boolean(element.readOnly))
     || element.getAttribute('aria-readonly') === 'true'
 }
 
@@ -127,7 +127,9 @@ function setContentEditableValue(element: HTMLElement, value: string): void {
   let applied = false
   try {
     applied = value === ''
+      // oxlint-disable-next-line typescript/no-deprecated -- Chromium execCommand preserves framework contenteditable behavior.
       ? ownerDocument.execCommand('delete', false)
+      // oxlint-disable-next-line typescript/no-deprecated -- paired with delete for contenteditable compatibility.
       : ownerDocument.execCommand('insertText', false, value)
   } catch {
     throw new PageActionError('BROWSER_ELEMENT_NOT_EDITABLE', 'the contenteditable editing command failed')
@@ -502,8 +504,6 @@ function dispatchKeySequence(
     const event = new KeyboardEvent(type, {
       key: eventKey,
       code,
-      keyCode: legacy,
-      which: legacy,
       bubbles: true,
       composed: true,
       cancelable: true,
@@ -511,6 +511,11 @@ function dispatchKeySequence(
       altKey: modifiers.alt === true,
       shiftKey: modifiers.shift === true,
       metaKey: modifiers.meta === true,
+    })
+    // Page listeners still inspect these legacy numeric fields; define own values without deprecated init members.
+    Object.defineProperties(event, {
+      keyCode: { value: legacy },
+      which: { value: legacy },
     })
     if (!element.dispatchEvent(event)) prevented = true
   }

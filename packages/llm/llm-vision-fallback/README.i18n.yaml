@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/llm/llm-vision-fallback/README.md
 README.md: 22c07e8bafa3e380f50bd2b2309e686c10bacbab
-README.zh.md: 408374b49b51aede8358d2c40bc9db91019a891d
+README.zh.md: 735e3f0d774545b78e5d371e85a43cb66effe34f

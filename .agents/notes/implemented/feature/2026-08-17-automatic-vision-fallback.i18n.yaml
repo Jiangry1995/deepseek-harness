@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-17-automatic-vision-fallback.md
 2026-08-17-automatic-vision-fallback.md: 9710bb61277328f5c425a62ea1de2398f64161da
-2026-08-17-automatic-vision-fallback.zh.md: 8f913eb1167464317a1c31c54777eff1bb9caa13
+2026-08-17-automatic-vision-fallback.zh.md: 4a5db0ef580d8214a3155b1ab03346095dc29268

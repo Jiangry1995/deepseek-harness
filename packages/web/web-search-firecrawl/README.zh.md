@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-一个由 [Firecrawl](https://firecrawl.dev) 支撑的包，接入 harness 的 [web 能力接缝](../web/README.md)（`ctx.web`）：`POST /v1/search` 上的 `WebSearchProvider`，加上 `POST /v1/scrape` 上的 `WebFetchProvider`。两者都以 id `firecrawl` 注册——接缝把搜索与抓取注册表分开，同一 id 在各自能力类型里各对应一个 provider。搜索端点历史上两种 `data` 形状（`data: object[]` 与 `data.web.results`）都被兼容。
+一个由 [Firecrawl](https://firecrawl.dev) 支撑的包，接入 harness 的 [web 能力接缝](../web/README.zh.md)（`ctx.web`）：`POST /v1/search` 上的 `WebSearchProvider`，加上 `POST /v1/scrape` 上的 `WebFetchProvider`。两者都以 id `firecrawl` 注册——接缝把搜索与抓取注册表分开，同一 id 在各自能力类型里各对应一个 provider。搜索端点历史上两种 `data` 形状（`data: object[]` 与 `data.web.results`）都被兼容。
 
 这是一个**实现**包：它把 provider 注册进 `ctx.web`，但不拥有 `ctx.web` 键，也不注册面向模型的工具（那是 `@deepseek-ai/dsh-tool-web` 的职责）。它是函数/命名空间插件（`inject: ['web']`），不是默认导出的 Service。
 
@@ -27,7 +27,7 @@
 
 ## 模型体验
 
-间接经由 [`dsh-tool-web`](../tool-web/README.md)：搜索保留受 `maxResults` 约束的 URL、标题与摘要；抓取保留解码后的正文与最终 URL；或两者精确的失败信息（包在消费者的错误封装里）。
+间接经由 [`dsh-tool-web`](../tool-web/README.zh.md)：搜索保留受 `maxResults` 约束的 URL、标题与摘要；抓取保留解码后的正文与最终 URL；或两者精确的失败信息（包在消费者的错误封装里）。
 
 #### KV Cache 影响
 

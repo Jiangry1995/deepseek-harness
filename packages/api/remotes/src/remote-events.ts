@@ -18,7 +18,7 @@ export const API_REMOTE_FORWARDED_EVENTS = [
   'agent-preset/selected',
   'browser/command',
   'commands/change',
-  'credentials/updated',
+  'credentials/reference-updated',
   'cordis/request-run',
   'cordis/request-run-resolved',
   'cordis/dynamic-package',

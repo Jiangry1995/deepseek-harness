@@ -14,11 +14,11 @@ Status: implemented
 
 Web Client 只在带版本的页面探测确认内容脚本后注册。注册会返回包含 Host 超时值的可续租租约。Client 在租约时长过半时续租，在 teardown 时断开连接，并在释放竞态期间获得的任何租约前等待正在进行的注册。Host 会清理过期提供方，选择最近出现的存活提供方，并在完成、取消、超时、断开连接、租约过期或服务 dispose（资源释放）时结算每个待处理操作。
 
-Host 到 Client 的命令使用 [Remote 事件交付决策](../architecture/2026-08-10-remote-event-delivery.md)定义的允许名单载体 `ctx.remote.$on('browser/command', ...)`。每条命令携带不透明请求 id 和所选提供方 id。其他提供方返回的完成结果会被拒绝，结果判别字段与操作不同也会失败，而不会被强制转换。
+Host 到 Client 的命令使用 [Remote 事件交付决策](../architecture/2026-08-10-remote-event-delivery.zh.md)定义的允许名单载体 `ctx.remote.$on('browser/command', ...)`。每条命令携带不透明请求 id 和所选提供方 id。其他提供方返回的完成结果会被拒绝，结果判别字段与操作不同也会失败，而不会被强制转换。
 
 扩展工具栏按钮会打开 MV3 侧栏。扩展自身的壳会探测可配置的明文 HTTP 回环 origin，在响应成功后嵌入完整 Harness Web UI，并把所选 origin 保存到扩展本地存储。默认值是 `http://127.0.0.1:3080`；校验只允许 `127.0.0.1` 和 `localhost` origin。该设计复用已经装配的 Web Client，不会在扩展内创建第二套对话实现。
 
-隔离世界桥使用带版本的请求／响应协议。页面端和内容脚本端会校验每个协议封装、操作、结果、标签页字段与错误代码。内容脚本会在匹配的 frame 中运行，让侧栏 Web UI 能够响应探测。MV3 Service Worker 只接受来自本扩展 id 且 sender 为明文 HTTP 回环地址的 Host 操作消息，只允许打开不含凭据的 HTTP(S) 目标，并路由封闭操作联合。manifest（元数据清单）授予侧栏、存储、Native Messaging、标签页、脚本注入和普通 HTTP(S) 页面访问权限；其 frame/connect 策略只允许使用明文 HTTP 的 `127.0.0.1` 与 `localhost`。当前页面读取、文档绑定操作与 Windows 服务恢复由[页面控制决策](2026-08-16-browser-side-assistant-page-control.md)负责。
+隔离世界桥使用带版本的请求／响应协议。页面端和内容脚本端会校验每个协议封装、操作、结果、标签页字段与错误代码。内容脚本会在匹配的 frame 中运行，让侧栏 Web UI 能够响应探测。MV3 Service Worker 只接受来自本扩展 id 且 sender 为明文 HTTP 回环地址的 Host 操作消息，只允许打开不含凭据的 HTTP(S) 目标，并路由封闭操作联合。manifest（元数据清单）授予侧栏、存储、Native Messaging、标签页、脚本注入和普通 HTTP(S) 页面访问权限；其 frame/connect 策略只允许使用明文 HTTP 的 `127.0.0.1` 与 `localhost`。当前页面读取、文档绑定操作与 Windows 服务恢复由[页面控制决策](2026-08-16-browser-side-assistant-page-control.zh.md)负责。
 
 Consumer 通过面向模型的工具暴露封闭的标签页与页面操作集。默认情况下，每项操作都会进入普通工具审批链；随附的侧边助手 preset 会显式关闭这层额外审批，因为扩展安装本身已授予浏览器能力，而嵌入式 Web UI 没有审批回答方。保留默认值的部署仍会对列出操作请求审批，因为它会暴露当前浏览器窗口中的 URL 与标题。扩展状态缺失仍是执行错误，因此安装不完整时，面向模型的能力不会静默消失。
 

@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-07-05-skill-system.md
 2026-07-05-skill-system.md: b4964be05bcc4f785cc383dddcc7c64643a9caac
-2026-07-05-skill-system.zh.md: 13ea7e8f33b4b182fe64d6ae5b61e1569e7a259e
+2026-07-05-skill-system.zh.md: 5c403f0d8b9fa0e0a1b0c11b4bfd317a14e4c755

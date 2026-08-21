@@ -84,8 +84,8 @@ function elements(): SidePanelElements {
 function tabsApi(initial?: SidePanelTab): SidePanelTabsApi & {
   activated: Array<(info: { tabId: number }) => void>
   updated: Array<(tabId: number, changeInfo: object, tab: SidePanelTab) => void>
-  get: ReturnType<typeof vi.fn>
-  query: ReturnType<typeof vi.fn>
+  get: Mock<(tabId: number) => Promise<SidePanelTab>>
+  query: Mock<(queryInfo: { active: true; currentWindow: true }) => Promise<SidePanelTab[]>>
 } {
   const activated: Array<(info: { tabId: number }) => void> = []
   const updated: Array<(tabId: number, changeInfo: object, tab: SidePanelTab) => void> = []

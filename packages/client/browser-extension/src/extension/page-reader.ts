@@ -256,11 +256,11 @@ function formField(
     || (element instanceof HTMLElement && isContentEditableElement(element)))
     ? MAX_TEXT_LENGTH
     : MAX_SHORT_FIELD_VALUE_LENGTH
-  const disabled = ('disabled' in element && Boolean((element as HTMLInputElement).disabled))
+  const disabled = ('disabled' in element && element.disabled)
     || element.getAttribute('aria-disabled') === 'true'
-  const readOnly = ('readOnly' in element && Boolean((element as HTMLInputElement).readOnly))
+  const readOnly = ('readOnly' in element && element.readOnly)
     || element.getAttribute('aria-readonly') === 'true'
-  const required = ('required' in element && Boolean((element as HTMLInputElement).required))
+  const required = ('required' in element && element.required)
     || element.getAttribute('aria-required') === 'true'
   const field: BridgePageField = {
     ref: assignPageRef(element, state),

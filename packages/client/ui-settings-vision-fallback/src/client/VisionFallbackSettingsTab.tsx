@@ -1,17 +1,19 @@
 /** Settings renderer for the automatic vision fallback provider. */
 
 import { useEffect, useId, type FormEvent, type ReactNode } from 'react'
-import type { InjectFace, PropsLocale, PropsRuntime, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
   VisionFallbackSettingsController,
-  VisionFallbackSettingsState,
 } from './controller.ts'
 import css from './VisionFallbackSettingsTab.module.css'
 
 /** Registration-side state and actions supplied to the renderer. */
 export interface VisionFallbackSettingsTabInjected {
   readonly controller: VisionFallbackSettingsController
-  readonly useVisionFallbackSettings: SnapshotSelectorHook<VisionFallbackSettingsState>
+  hooks: {
+    /** Settings snapshot bound by the UI renderer as useVisionFallbackSettings. */
+    visionFallbackSettings: VisionFallbackSettingsController['store']
+  }
 }
 
 /** Full props assembled by the Plugins tab renderer. */

@@ -32,7 +32,7 @@ import { CHAT_SEARCH_MAX_LINES, type SearchCardModel } from '../models/search-ca
 import { terminalBlockLabels, type TerminalCardModel } from '../models/terminal-card-model.ts'
 import type { ToolRowState, ToolRowVariant } from '../models/tool-call-model.ts'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
-import type { ImageLoader } from '@deepseek-ai/dsh-client-ui-attachment'
+import type { RenderMessageImages } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { ToolResultImages } from './ToolResultImages.tsx'
 import css from './ToolRow.module.css'
 
@@ -107,11 +107,11 @@ export interface ToolRowProps {
   /**
    * Durable image attachments from the settled result. Rendered as thumbnails
    * outside the disclosure (visible while the envelope is collapsed) when
-   * `loadImage` is also present.
+   * `renderImages` is also present.
    */
   images?: readonly ImageAttachmentRef[] | undefined
-  /** Session-authorized image URL loader; absent skips the thumbnail gallery. */
-  loadImage?: ImageLoader | undefined
+  /** Attachment-slot renderer; absent skips the thumbnail gallery. */
+  renderImages?: RenderMessageImages | undefined
 }
 
 /** Leading-slot state substitution: the tool icon yields to the terminal state
@@ -159,7 +159,7 @@ export function ToolRow({
   onOpenFile,
   inspect,
   images,
-  loadImage,
+  renderImages,
 }: ToolRowProps) {
   const [expanded, setExpanded] = useState(false)
   const terminalBody = terminal ?? null
@@ -168,8 +168,8 @@ export function ToolRow({
   const searchBody = search ?? null
   const webBody = web ?? null
   const outputText = output ?? null
-  const imagePreview = images !== undefined && images.length > 0 && loadImage !== undefined
-    ? { images, load: loadImage }
+  const imagePreview = images !== undefined && images.length > 0 && renderImages !== undefined
+    ? { images, renderImages }
     : null
   // A card replaces the text body; a call carries at most one card kind, so the
   // card props are mutually exclusive. Any of them, or a text body/output,
@@ -324,8 +324,7 @@ export function ToolRow({
       {imagePreview !== null && (
         <ToolResultImages
           images={imagePreview.images}
-          load={imagePreview.load}
-          t={t}
+          renderImages={imagePreview.renderImages}
           className={css.resultImages}
         />
       )}

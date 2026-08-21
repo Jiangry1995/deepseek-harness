@@ -12,7 +12,7 @@
 
 ## 模型体验
 
-通过 [`dsh-web-networking`](../../web/web-networking/README.md) 间接影响；后者负责持久化偏好以及由此产生的 `web_search`/`web_fetch` schema 可见性，本包只在 Web Client 中提供该选项。
+通过 [`dsh-web-networking`](../../web/web-networking/README.zh.md) 间接影响；后者负责持久化偏好以及由此产生的 `web_search`/`web_fetch` schema 可见性，本包只在 Web Client 中提供该选项。
 
 #### KV Cache 影响
 

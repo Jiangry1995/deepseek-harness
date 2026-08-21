@@ -20,9 +20,7 @@
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
-  BrandWordmark, FishLogo,
-  IconNewChatOutline16, IconPanelLeftOutline16,
-  Tooltip,
+  FishLogo, IconNewChatOutline16, IconPanelLeftOutline16, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SidebarRootComponentProps } from './contract/slots.ts'
 import { SidePanelShell } from './SidePanelShell.tsx'
@@ -149,7 +147,7 @@ function DesktopSidebarColumn({
       onPointerLeave={() => { armLinger() }}
     >
       <div className={css.logoRow}>
-        {/* Expanded, the wordmark doubles as a New Session shortcut; the
+        {/* Expanded, the brand doubles as a New Session shortcut; the
             collapsed rail's logo is the expand toggle below instead. */}
         {wide && (
           <button
@@ -158,7 +156,23 @@ function DesktopSidebarColumn({
             aria-label={t('session.new.label')}
             onClick={() => { startSession() }}
           >
-            <BrandWordmark />
+            <span className={css.brandIdentity} aria-hidden="true">
+              <span className={css.brandMark}>
+                {renderSlot('sidebar.brand.mark', { size: 24 }, { fallback: <FishLogo size={24} /> })}
+              </span>
+              <span className={css.brandName}>
+                {renderSlot('sidebar.brand.name', {}, {
+                  fallback: (
+                    <>
+                      <span className={css.fallbackBrandName}>DSH Local Build</span>
+                      {process.env.DSH_CLIENT_COMMIT_HASH
+                        ? <span className={css.buildRevision}>{process.env.DSH_CLIENT_COMMIT_HASH}</span>
+                        : null}
+                    </>
+                  ),
+                })}
+              </span>
+            </span>
           </button>
         )}
         {/* Rail resting state is the whale mark; hovering swaps in the panel
@@ -170,7 +184,11 @@ function DesktopSidebarColumn({
             aria-label={collapsed ? t('toggle.open') : t('toggle.collapse')}
             onClick={() => { toggleSidebar() }}
           >
-            {!wide && <FishLogo className={css.railFish} size={24} />}
+            {!wide && (
+              <span className={css.railMark} aria-hidden="true">
+                {renderSlot('sidebar.brand.mark', { size: 24 }, { fallback: <FishLogo size={24} /> })}
+              </span>
+            )}
             {/* Rail icons render at 18 (figma rail spec); expanded keeps the glyph-native sizes. */}
             <IconPanelLeftOutline16 className={css.panelIcon} size={wide ? 16 : 18} />
           </button>

@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-一个由 [Tavily](https://tavily.com) 支撑的 `WebSearchProvider`，接入 harness 的 [web 能力接缝](../web/README.md)（`ctx.web`）。它调用 Tavily 的 `POST /search` 端点（`include_answer` + 高级检索深度），把 LLM 生成的 `answer` 映射为 `content`，把 `results[]` 映射为接缝规范化的 `WebSearchResult`。
+一个由 [Tavily](https://tavily.com) 支撑的 `WebSearchProvider`，接入 harness 的 [web 能力接缝](../web/README.zh.md)（`ctx.web`）。它调用 Tavily 的 `POST /search` 端点（`include_answer` + 高级检索深度），把 LLM 生成的 `answer` 映射为 `content`，把 `results[]` 映射为接缝规范化的 `WebSearchResult`。
 
 这是一个**实现**包：它把 provider 注册进 `ctx.web`，但不拥有 `ctx.web` 键，也不注册面向模型的工具（那是 `@deepseek-ai/dsh-tool-web` 的职责）。它是函数/命名空间插件（`inject: ['web']`），不是默认导出的 Service。
 
@@ -27,7 +27,7 @@ Tavily 返回扁平的 `results[]` 加上可选的 LLM 生成的 `answer`。`ans
 
 ## 模型体验
 
-间接经由 [`dsh-tool-web`](../tool-web/README.md)：它保留本 provider 的受 `maxResults` 约束的 URL、标题、摘要、发布日期与生成的答案，或其精确的失败信息（包在消费者的错误封装里）。
+间接经由 [`dsh-tool-web`](../tool-web/README.zh.md)：它保留本 provider 的受 `maxResults` 约束的 URL、标题、摘要、发布日期与生成的答案，或其精确的失败信息（包在消费者的错误封装里）。
 
 #### KV Cache 影响
 

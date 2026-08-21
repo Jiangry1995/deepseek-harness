@@ -38,6 +38,6 @@ console 捕获记录字符串、原始值和固定对象类别标记，绝不枚
 
 ## 相关
 
-- [Console 渲染](2026-08-20-page-probe-console-inspect.md) — 负责有效捕获期间的诊断值转换。
-- [浏览器标签页扩展](../feature/2026-08-14-browser-tab-extension.md) — 负责扩展提供方和浏览器操作集。
-- [语义浏览器自动化](../feature/2026-08-16-semantic-browser-automation.md) — 负责文档标识、revision 和等待语义。
+- [Console 渲染](2026-08-20-page-probe-console-inspect.zh.md) — 负责有效捕获期间的诊断值转换。
+- [浏览器标签页扩展](../feature/2026-08-14-browser-tab-extension.zh.md) — 负责扩展提供方和浏览器操作集。
+- [语义浏览器自动化](../feature/2026-08-16-semantic-browser-automation.zh.md) — 负责文档标识、revision 和等待语义。

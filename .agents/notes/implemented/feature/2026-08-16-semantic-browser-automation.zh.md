@@ -4,7 +4,7 @@ Status: implemented
 
 [English](2026-08-16-semantic-browser-automation.md) | 中文
 
-本记录扩展[浏览器侧边助手页面控制](2026-08-16-browser-side-assistant-page-control.md)。先前记录仍是先读取后操作、不透明 ref、敏感字段排除和伴随程序启动的权威说明。本记录补充文档身份、等待、滚动、聚焦和有限键盘操作。
+本记录扩展[浏览器侧边助手页面控制](2026-08-16-browser-side-assistant-page-control.zh.md)。先前记录仍是先读取后操作、不透明 ref、敏感字段排除和伴随程序启动的权威说明。本记录补充文档身份、等待、滚动、聚焦和有限键盘操作。
 
 ## 问题
 
@@ -20,7 +20,7 @@ Status: implemented
 
 `read-page` 接受可选 `tabId`。省略时仍读取当前活动网页页签，并优先使用侧栏标题记录的页签。Chrome 内部页、扩展页和无法注入脚本的页面返回 `BROWSER_PAGE_ACCESS_DENIED`。
 
-Service Worker 为每份返回的快照记录来源页签。文档绑定操作先解析保留的 `pageId`，再考虑侧栏当前页签，因此读取后切换页签不会把操作重定向到别处。`wait-page` 优先接受最近的 `pageId`。保留绑定与显式 `tabId` 冲突时返回 `BROWSER_PAGE_STALE`。内存中绑定缺失时，与填写一样退回到焦点或当前活动页签，因为 Service Worker 重启会丢掉映射，而页面和侧栏仍在；该修正由[聊天发送与等待恢复](../bug-fix/2026-08-19-browser-composer-send-and-wait-recovery.md)记录。侧栏页签投影使用单调 generation，较慢返回的旧页签查询不能覆盖最新标题和焦点页签报告。
+Service Worker 为每份返回的快照记录来源页签。文档绑定操作先解析保留的 `pageId`，再考虑侧栏当前页签，因此读取后切换页签不会把操作重定向到别处。`wait-page` 优先接受最近的 `pageId`。保留绑定与显式 `tabId` 冲突时返回 `BROWSER_PAGE_STALE`。内存中绑定缺失时，与填写一样退回到焦点或当前活动页签，因为 Service Worker 重启会丢掉映射，而页面和侧栏仍在；该修正由[聊天发送与等待恢复](../bug-fix/2026-08-19-browser-composer-send-and-wait-recovery.zh.md)记录。侧栏页签投影使用单调 generation，较慢返回的旧页签查询不能覆盖最新标题和焦点页签报告。
 
 字段和操作元素会报告自己是否为 `document.activeElement`。模型可见的页面结果包含浏览器页签 id、焦点状态、原生选项、链接 href，以及读取器已经采集的 checked、selected、expanded 和 pressed 状态。
 

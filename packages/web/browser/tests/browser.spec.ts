@@ -348,7 +348,7 @@ describe('BrowserService operation lifecycle', () => {
 
     expect(() => ctx.browser.resolvePressPage({ ...target, key: 'Enter', repeat: 21 }))
       .toThrow(expect.objectContaining({ code: 'BROWSER_INVALID_REQUEST' }))
-    expect(() => ctx.browser.resolvePressPage({ ...target, key: 'a' as 'Enter' }))
+    expect(() => ctx.browser.resolvePressPage({ ...target, key: 'a' }))
       .toThrow(expect.objectContaining({ code: 'BROWSER_KEY_UNSUPPORTED' }))
 
     const waited = ctx.browser.waitPage({

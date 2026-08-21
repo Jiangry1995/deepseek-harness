@@ -1,5 +1,7 @@
 # Browser Companion Autostart Implementation Plan
 
+English | [中文](2026-08-15-browser-companion-autostart.zh.md)
+
 > **For agentic workers:** Execute this plan in the existing browser-extension worktree because the feature it extends is still uncommitted there. Do not stage, commit, or push without the user's request.
 
 **Goal:** Install a Windows tray companion that starts the Harness Web profile at sign-in, lets the user open, stop, restart, and inspect it, and lets the Chromium side panel recover by starting the companion and Web service when sign-in startup did not run.

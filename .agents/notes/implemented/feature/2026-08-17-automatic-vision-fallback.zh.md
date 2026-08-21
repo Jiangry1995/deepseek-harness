@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-持久图片输入与 [`read_image` 工具](2026-08-10-minimal-read-image-tool.md) 会刻意拒绝纯文本路由。这样能够避免把所选适配器无法序列化的图片块写进会话历史，但也导致 DeepSeek 等强文本模型无法查看粘贴的截图或视频帧，即使部署已经配置了另一条视觉模型路由。用户只能把整个会话切到视觉模型、手工运行外部识别器，或者接受 `read_image` 的失败。
+持久图片输入与 [`read_image` 工具](2026-08-10-minimal-read-image-tool.zh.md) 会刻意拒绝纯文本路由。这样能够避免把所选适配器无法序列化的图片块写进会话历史，但也导致 DeepSeek 等强文本模型无法查看粘贴的截图或视频帧，即使部署已经配置了另一条视觉模型路由。用户只能把整个会话切到视觉模型、手工运行外部识别器，或者接受 `read_image` 的失败。
 
 外部 `dsh-vision-recognizer` 项目展示了有价值的产品形态：继续由 DeepSeek 推理和回答，只用可配置视觉模型转译图片。它的适配器代理声明图片输入，在 `stream()` 内把图片替换为文本，并直接拥有供应商 HTTP 协议和第二套凭据／设置存储。Harness 核心不能照搬这个机制：替换文本从不进入会话日志，因此恢复、fork、压缩与请求重建无法证明主模型看到了什么；重复实现 OpenAI、Anthropic、Gemini、Qwen、Ollama 和网关配置，也会与现有 `llm-pi-ai`、模型页面、settings 和 credentials 所有权冲突。
 

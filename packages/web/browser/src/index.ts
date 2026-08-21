@@ -6,7 +6,7 @@
 import { randomUUID } from 'node:crypto'
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { HarnessError } from '@deepseek-ai/dsh-llm'
+import { assertNever, HarnessError } from '@deepseek-ai/dsh-llm'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import {
   BrowserClientId as brandBrowserClientId,
@@ -197,41 +197,37 @@ function resolveHttpUrl(rawUrl: string): string {
  * copying those snapshot fields; inventing them is worse than a ready wait.
  */
 function resolveWaitCondition(condition: BrowserWaitCondition): BrowserWaitCondition {
-  if (condition.kind === 'change') {
-    const documentId = 'documentId' in condition ? condition.documentId : undefined
-    const afterRevision = 'afterRevision' in condition ? condition.afterRevision : undefined
-    if (typeof documentId !== 'string' || typeof afterRevision !== 'number') {
-      return { kind: 'ready' }
+  switch (condition.kind) {
+    case 'change': {
+      const documentId = 'documentId' in condition ? condition.documentId : undefined
+      const afterRevision = 'afterRevision' in condition ? condition.afterRevision : undefined
+      if (typeof documentId !== 'string' || typeof afterRevision !== 'number') {
+        return { kind: 'ready' }
+      }
+      if (!PAGE_ID_PATTERN.test(documentId) || !Number.isSafeInteger(afterRevision) || afterRevision < 0) {
+        throw fail('browser: wait change condition requires a documentId and non-negative afterRevision', 'BROWSER_INVALID_REQUEST')
+      }
+      return {
+        kind: 'change',
+        documentId: brandBrowserDocumentId(documentId),
+        afterRevision,
+      }
     }
-    if (!PAGE_ID_PATTERN.test(documentId) || !Number.isSafeInteger(afterRevision) || afterRevision < 0) {
-      throw fail('browser: wait change condition requires a documentId and non-negative afterRevision', 'BROWSER_INVALID_REQUEST')
+    case 'text': {
+      if (condition.text.length === 0 || condition.text.length > 1_000) {
+        throw fail('browser: wait text must be 1-1000 characters', 'BROWSER_INVALID_REQUEST')
+      }
+      return { kind: 'text', text: condition.text, state: condition.state }
     }
-    return {
-      kind: 'change',
-      documentId: brandBrowserDocumentId(documentId),
-      afterRevision,
+    case 'url': {
+      if (condition.value.length === 0 || condition.value.length > 2_000) {
+        throw fail('browser: wait url value must be 1-2000 characters', 'BROWSER_INVALID_REQUEST')
+      }
+      return { kind: 'url', value: condition.value, match: condition.match }
     }
+    case 'ready': return { kind: 'ready' }
+    default: return assertNever(condition, 'browser wait condition')
   }
-  if (condition.kind === 'text') {
-    if (typeof condition.text !== 'string' || condition.text.length === 0 || condition.text.length > 1_000) {
-      throw fail('browser: wait text must be 1-1000 characters', 'BROWSER_INVALID_REQUEST')
-    }
-    if (condition.state !== 'present' && condition.state !== 'absent') {
-      throw fail('browser: wait text state must be present or absent', 'BROWSER_INVALID_REQUEST')
-    }
-    return { kind: 'text', text: condition.text, state: condition.state }
-  }
-  if (condition.kind === 'url') {
-    if (typeof condition.value !== 'string' || condition.value.length === 0 || condition.value.length > 2_000) {
-      throw fail('browser: wait url value must be 1-2000 characters', 'BROWSER_INVALID_REQUEST')
-    }
-    if (condition.match !== 'exact' && condition.match !== 'prefix' && condition.match !== 'contains') {
-      throw fail('browser: wait url match must be exact, prefix, or contains', 'BROWSER_INVALID_REQUEST')
-    }
-    return { kind: 'url', value: condition.value, match: condition.match }
-  }
-  if (condition.kind === 'ready') return { kind: 'ready' }
-  throw fail('browser: wait condition kind is not supported', 'BROWSER_INVALID_REQUEST')
 }
 
 /** Return whether a value is a caller AbortSignal rather than a request record. */

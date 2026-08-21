@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/bundle/vision-fallback/README.md
 README.md: ee5c1fad19e85ccbfdd3e2a26d83f313460cbf29
-README.zh.md: 3e056d7c74956f7aa0da96299d5cf17e7d11557d
+README.zh.md: 6a82f9d1e5251efbf1e9777cf2fa1399f354b297

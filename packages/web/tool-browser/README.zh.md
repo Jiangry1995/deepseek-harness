@@ -4,7 +4,7 @@
 
 浏览器标签页控制、当前页面读取和文档绑定页面交互能力的 Consumer 插件。它通过 `ctx.browser` 注册面向模型的操作，向系统提示词贡献浏览器使用指引，把标签页、页面与操作结果渲染为文本，并可将每项操作接入工具审批链。
 
-生成的[工具目录](../../../docs/tool-catalog.md)是完整的 schema 参考。本包保持工具名称和参数与提供方无关：模型收到浏览器分配的标签页 id 和绝对 HTTP(S) URL，不会接触 Chromium 扩展或 Remote 协议字段。
+生成的[工具目录](../../../docs/tool-catalog.zh.md)是完整的 schema 参考。本包保持工具名称和参数与提供方无关：模型收到浏览器分配的标签页 id 和绝对 HTTP(S) URL，不会接触 Chromium 扩展或 Remote 协议字段。
 
 ## 配置与审批
 
@@ -41,7 +41,7 @@ Treat the user's current Chromium window as an execution environment. Infer whet
 
 #### 模型看到的内容
 
-模型会看到生成的[工具目录](../../../docs/tool-catalog.md#deepseek-aidsh-tool-browser)中的十三个浏览器工具 schema。`browser_read_page` 返回标签页 id、可见文本、焦点与 ARIA 状态、原生选项、链接目标、滚动目标、视口指标、文档绑定引用、`documentId`、`revision` 和截断标记。新消息只要指向当前页面，就必须执行一次不带 `tabId` 的新调用；较早的页面结果不能确定该消息对应的当前标签页。`browser_inspect` 必须指定 `start`、`snapshot` 或 `stop`，并且只返回 `start` 后观察到的页面 fetch/XHR 调用和 console 消息；调用方以 `stop` 结束并释放页面钩子。`browser_click`、`browser_fill`、`browser_select`、`browser_scroll`、`browser_focus` 与 `browser_press` 要求最近一次读取返回的 `pageId/ref` 对。`browser_wait_for` 优先使用这个 `pageId`，尚无快照时才接受 `tabId`；它等待页面条件并返回新快照。标签页结果包含浏览器分配 id、活动状态、URL 和 Chromium 可提供的标题。
+模型会看到生成的[工具目录](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-browser)中的十三个浏览器工具 schema。`browser_read_page` 返回标签页 id、可见文本、焦点与 ARIA 状态、原生选项、链接目标、滚动目标、视口指标、文档绑定引用、`documentId`、`revision` 和截断标记。新消息只要指向当前页面，就必须执行一次不带 `tabId` 的新调用；较早的页面结果不能确定该消息对应的当前标签页。`browser_inspect` 必须指定 `start`、`snapshot` 或 `stop`，并且只返回 `start` 后观察到的页面 fetch/XHR 调用和 console 消息；调用方以 `stop` 结束并释放页面钩子。`browser_click`、`browser_fill`、`browser_select`、`browser_scroll`、`browser_focus` 与 `browser_press` 要求最近一次读取返回的 `pageId/ref` 对。`browser_wait_for` 优先使用这个 `pageId`，尚无快照时才接受 `tabId`；它等待页面条件并返回新快照。标签页结果包含浏览器分配 id、活动状态、URL 和 Chromium 可提供的标题。
 
 #### Token 影响
 
@@ -54,5 +54,5 @@ Treat the user's current Chromium window as an execution environment. Infer whet
 ## 已知限制与暂缓事项
 
 - **没有原生 DevTools 窗口**：Chromium 不允许扩展打开 F12 界面。`browser_inspect` 是 Network/Console 的替代读取入口，不返回请求或响应体。
-- **没有扩展设置工具**：缺少提供方时会产生 `BROWSER_EXTENSION_UNAVAILABLE`；安装仍是用户显式执行的操作，见 [`dsh-client-browser-extension`](../../client/browser-extension/README.md)。
+- **没有扩展设置工具**：缺少提供方时会产生 `BROWSER_EXTENSION_UNAVAILABLE`；安装仍是用户显式执行的操作，见 [`dsh-client-browser-extension`](../../client/browser-extension/README.zh.md)。
 - **只提供引用式操作**：这些工具只会点击、编辑、滚动、聚焦和有限按键最近一次页面读取公开的元素，不接受任意选择器，不操作跨源 frame，不读取 Cookie 或存储，不管理下载，也不提供不受限制的浏览器自动化。

@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-19-browser-composer-send-and-wait-recovery.md
 2026-08-19-browser-composer-send-and-wait-recovery.md: bbfad421aef0db43b7a12ad2bd084c493fbe527a
-2026-08-19-browser-composer-send-and-wait-recovery.zh.md: cd166b7aaef44c9e0e1fb7305904119f823f3a5a
+2026-08-19-browser-composer-send-and-wait-recovery.zh.md: a1b9e17ae2f6b474d00fc1363552a9a25d587a7f
