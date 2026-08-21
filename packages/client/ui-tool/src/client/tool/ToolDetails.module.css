@@ -44,3 +44,7 @@
   line-height: 20px;
   color: var(--dsw-alias-label-tertiary);
 }
+
+.resultImages {
+  margin: 0 0 12px;
+}

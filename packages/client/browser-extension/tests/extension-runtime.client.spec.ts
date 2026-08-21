@@ -139,8 +139,10 @@ describe('browser extension protocol guards', () => {
       kind: 'press-page-key', pageId, ref: 'e1', key: 's', modifiers: { ctrl: true }, repeat: 1,
     })).toBe(true)
     expect(isBridgeOperation({ kind: 'press-page-key', pageId, ref: 'e1', key: 'F12', modifiers: {}, repeat: 1 })).toBe(false)
-    expect(isBridgeOperation({ kind: 'inspect-page', reset: false })).toBe(true)
-    expect(isBridgeOperation({ kind: 'inspect-page', tabId: 9, reset: true })).toBe(true)
+    expect(isBridgeOperation({ kind: 'inspect-page', mode: 'start' })).toBe(true)
+    expect(isBridgeOperation({ kind: 'inspect-page', tabId: 9, mode: 'snapshot' })).toBe(true)
+    expect(isBridgeOperation({ kind: 'inspect-page', mode: 'stop' })).toBe(true)
+    expect(isBridgeOperation({ kind: 'inspect-page', reset: false })).toBe(false)
     expect(isBridgeOperation({ kind: 'inspect-page' })).toBe(false)
     expect(isBridgeOperation({ kind: 'click-page-element', pageId, ref: 'e1' })).toBe(true)
     expect(isBridgeOperation({ kind: 'fill-page-element', pageId, ref: 'e1', value: 'deepseek', submit: true })).toBe(true)
@@ -360,6 +362,7 @@ describe('Chromium tabs adapter', () => {
       target: { tabId: 9 },
       files: ['page-content.js'],
     })
+    expect(scripting.executeScript).toHaveBeenCalledTimes(1)
     expect(tabs.sendMessage).toHaveBeenCalledTimes(2)
   })
 
@@ -441,9 +444,11 @@ describe('Chromium tabs adapter', () => {
       },
     })
 
-    await expect(executeBridgeOperation(tabs as never, scriptingApi() as never, {
+    const scripting = scriptingApi()
+    scripting.executeScript.mockResolvedValue([{ frameId: 0, result: undefined }])
+    await expect(executeBridgeOperation(tabs as never, scripting as never, {
       kind: 'inspect-page',
-      reset: false,
+      mode: 'snapshot',
     })).resolves.toMatchObject({
       kind: 'inspect-page',
       inspect: {
@@ -453,7 +458,12 @@ describe('Chromium tabs adapter', () => {
         console: [{ level: 'error', text: 'submit failed' }],
       },
     })
-    expect(tabs.sendMessage).toHaveBeenCalledWith(12, { kind: 'dsh-inspect-page', reset: false })
+    expect(scripting.executeScript).toHaveBeenCalledWith({
+      target: { tabId: 12 },
+      files: ['page-probe.js'],
+      world: 'MAIN',
+    })
+    expect(tabs.sendMessage).toHaveBeenCalledWith(12, { kind: 'dsh-inspect-page', mode: 'snapshot' })
   })
 
   it('reads a specified tab without activating it and waits for page changes', async () => {
@@ -758,17 +768,6 @@ describe('MV3 extension manifest', () => {
         js: ['content.js'],
         run_at: 'document_start',
         all_frames: true,
-      }, {
-        matches: ['http://*/*', 'https://*/*'],
-        js: ['page-probe.js'],
-        run_at: 'document_start',
-        all_frames: false,
-        world: 'MAIN',
-      }, {
-        matches: ['http://*/*', 'https://*/*'],
-        js: ['page-content.js'],
-        run_at: 'document_idle',
-        all_frames: false,
       }],
     })
     expect(manifest.key).toEqual(expect.any(String))

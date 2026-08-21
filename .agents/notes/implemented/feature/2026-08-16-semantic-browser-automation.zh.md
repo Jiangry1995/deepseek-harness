@@ -16,7 +16,7 @@ Status: implemented
 
 - `pageId` 仍在每次读取时重新生成。元素 ref 只对该快照有效。
 - `documentId` 是不透明随机 UUID，在当前文档生命周期内保持不变；刷新、导航或文档替换后改变。不能用 URL 代替。
-- `revision` 是该文档生命周期内由 MutationObserver 维护的单调计数。读取本身不会增加它。
+- `revision` 是单调递增的文档变更计数器。每次读取都会启动一个 MutationObserver，在后续第一次非协议变更时递增并断开；稳定性等待拥有仅限该请求生命周期的独立 observer。
 
 `read-page` 接受可选 `tabId`。省略时仍读取当前活动网页页签，并优先使用侧栏标题记录的页签。Chrome 内部页、扩展页和无法注入脚本的页面返回 `BROWSER_PAGE_ACCESS_DENIED`。
 

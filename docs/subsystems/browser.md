@@ -175,17 +175,17 @@ async listTabs(signal: AbortSignal): Promise<BrowserTab[]>
 async readPage(requestOrSignal: BrowserReadPageRequest | AbortSignal, signal?: AbortSignal): Promise<BrowserPage>
 
 /**
- * Read recent page fetch/XHR calls and console messages captured after the in-page probe was installed.
- * Native DevTools cannot be opened; this is the inspect surface available to the assistant.
- * @param requestOrSignal - optional tab identity and reset flag, or the caller AbortSignal for the active tab.
- * @param signal - caller cancellation when the first argument is a request record.
+ * Start, snapshot, or stop bounded page fetch/XHR and console observation.
+ * Native DevTools cannot be opened, and observations begin only after a start request.
+ * @param request - observation mode and optional tab identity.
+ * @param signal - caller cancellation.
  * @returns the tab metadata and bounded Network/Console snapshot.
  */
-async inspectPage( requestOrSignal: BrowserInspectPageRequest | AbortSignal, signal?: AbortSignal, ): Promise<BrowserPageInspect>
+async inspectPage( request: BrowserInspectPageRequest, signal: AbortSignal, ): Promise<BrowserPageInspect>
 
 /**
  * Validate and default one inspect-page request.
- * @param request - optional tab identity and reset flag.
+ * @param request - observation mode and optional tab identity.
  * @returns a complete provider operation.
  */
 resolveInspectPage(request: BrowserInspectPageRequest): BrowserInspectPageSpec
@@ -292,7 +292,7 @@ async activateTab(tabId: number, signal: AbortSignal): Promise<BrowserTab>
 async closeTab(tabId: number, signal: AbortSignal): Promise<{ tabId: number; closed: true }>
 ```
 
-Source: [`packages/web/browser/src/index.ts:268`](../../packages/web/browser/src/index.ts)
+Source: [`packages/web/browser/src/index.ts:296`](../../packages/web/browser/src/index.ts)
 
 <a id="browser-events"></a>
 
@@ -313,5 +313,5 @@ Deliver one browser command to the selected Web Client provider.
 'browser/command'(command: BrowserCommand): void
 ```
 
-Source: [`packages/web/browser/src/types.ts:540`](../../packages/web/browser/src/types.ts)
+Source: [`packages/web/browser/src/types.ts:552`](../../packages/web/browser/src/types.ts)
 <!-- END GENERATED cordis-surface -->

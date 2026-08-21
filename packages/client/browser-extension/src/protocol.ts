@@ -3,7 +3,7 @@
 /** Protocol channel shared by the Web Client, content script, and Service Worker. */
 export const BROWSER_EXTENSION_CHANNEL = 'dsh-browser-extension'
 /** Protocol version shared by the Web Client, content script, and Service Worker. */
-export const BROWSER_EXTENSION_PROTOCOL_VERSION = 6
+export const BROWSER_EXTENSION_PROTOCOL_VERSION = 7
 /** Maximum serialized UTF-8 bytes accepted for one complete page-read result. */
 export const BROWSER_PAGE_RESULT_MAX_BYTES = 96 * 1024
 /** Maximum serialized UTF-8 bytes accepted for one page-inspect result. */
@@ -306,7 +306,7 @@ export type BridgeOperation =
   | { kind: 'open-tab'; url: string; active: boolean }
   | { kind: 'list-tabs' }
   | { kind: 'read-page'; tabId?: number }
-  | { kind: 'inspect-page'; tabId?: number; reset: boolean }
+  | { kind: 'inspect-page'; tabId?: number; mode: 'start' | 'snapshot' | 'stop' }
   | BridgePageActionOperation
   | {
     kind: 'wait-page'
@@ -776,7 +776,7 @@ export function isBridgeOperation(value: unknown): value is BridgeOperation {
     case 'list-tabs': return true
     case 'read-page': return value.tabId === undefined || isSafeTabId(value.tabId)
     case 'inspect-page': return (value.tabId === undefined || isSafeTabId(value.tabId))
-      && typeof value.reset === 'boolean'
+      && (value.mode === 'start' || value.mode === 'snapshot' || value.mode === 'stop')
     case 'click-page-element':
     case 'focus-page-element': return isPageId(value.pageId) && isPageRef(value.ref)
     case 'fill-page-element': return isPageId(value.pageId)

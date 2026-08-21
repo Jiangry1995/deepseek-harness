@@ -29,7 +29,7 @@ export const DSH_INSPECT_PAGE_KIND = 'dsh-inspect-page'
 type PageReader = () => BridgePageContent
 type PageActor = (operation: BridgePageActionOperation) => BridgePageActionReceipt | BridgeScrollReceipt
 type PageWaiter = (operation: BridgeWaitPageDomOperation) => Promise<BridgePageContent>
-type PageInspector = (reset: boolean) => Promise<BridgePageInspectContent>
+type PageInspector = (mode: 'start' | 'snapshot' | 'stop') => Promise<BridgePageInspectContent>
 
 interface PageReaderRuntime {
   readonly onMessage: Pick<typeof chrome.runtime.onMessage, 'addListener' | 'removeListener'>
@@ -95,13 +95,13 @@ export function isWaitPageDomRequest(message: unknown): message is {
  */
 export function isInspectPageDomRequest(message: unknown): message is {
   kind: typeof DSH_INSPECT_PAGE_KIND
-  reset: boolean
+  mode: 'start' | 'snapshot' | 'stop'
 } {
   return typeof message === 'object' && message !== null
     && 'kind' in message
     && message.kind === DSH_INSPECT_PAGE_KIND
-    && 'reset' in message
-    && typeof message.reset === 'boolean'
+    && 'mode' in message
+    && (message.mode === 'start' || message.mode === 'snapshot' || message.mode === 'stop')
 }
 
 /** Map a thrown page-script error onto a stable bridge failure. */
@@ -171,7 +171,7 @@ export function installPageReader(
         sendResponse(failurePayload(new Error('browser extension: page inspector is unavailable')))
         return false
       }
-      void inspectPage(message.reset).then((content) => {
+      void inspectPage(message.mode).then((content) => {
         if (!isBridgePageInspectContent(content)) {
           sendResponse(failurePayload(new Error('browser extension: page script returned an invalid inspect result')))
           return

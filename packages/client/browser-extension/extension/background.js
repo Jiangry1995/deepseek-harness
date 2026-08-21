@@ -130,7 +130,7 @@ function isNonNegativeNumber(value) {
 }
 /** Match the shared protocol envelope and an expected message direction. */
 function hasEnvelope(value, direction) {
-	return value.channel === "dsh-browser-extension" && value.version === 6 && value.direction === direction;
+	return value.channel === "dsh-browser-extension" && value.version === 7 && value.direction === direction;
 }
 /** Validate a normalized tab received across the isolated-world bridge. */
 function isBridgeTab(value) {
@@ -244,7 +244,7 @@ function isBridgeOperation(value) {
 		case "open-tab": return typeof value.url === "string" && typeof value.active === "boolean";
 		case "list-tabs": return true;
 		case "read-page": return value.tabId === void 0 || isSafeTabId(value.tabId);
-		case "inspect-page": return (value.tabId === void 0 || isSafeTabId(value.tabId)) && typeof value.reset === "boolean";
+		case "inspect-page": return (value.tabId === void 0 || isSafeTabId(value.tabId)) && (value.mode === "start" || value.mode === "snapshot" || value.mode === "stop");
 		case "click-page-element":
 		case "focus-page-element": return isPageId(value.pageId) && isPageRef(value.ref);
 		case "fill-page-element": return isPageId(value.pageId) && isPageRef(value.ref) && typeof value.value === "string" && value.value.length <= 1e4 && typeof value.submit === "boolean";
@@ -532,7 +532,7 @@ const PAGE_READ_TIMEOUT_MS = 5e3;
 const PAGE_INJECT_TIMEOUT_MS = 5e3;
 /** Reader bundle injected into tabs that loaded before this extension generation. */
 const PAGE_READER_FILE = "page-content.js";
-/** MAIN-world probe injected so fetch/XHR/console can be observed. */
+/** Dormant MAIN-world probe controller injected only for inspect operations. */
 const PAGE_PROBE_FILE = "page-probe.js";
 /** Tab shown in the side-panel header; read-page prefers this over the Service Worker's window guess. */
 let focusedTabId;
@@ -581,7 +581,14 @@ function askPageScript(tabs, tabId, message, timeoutMs = PAGE_READ_TIMEOUT_MS) {
 	return withTimeout(tabs.sendMessage(tabId, message), timeoutMs, "browser extension: page reader did not answer before timeout");
 }
 /** Inject the current page-content generation into one existing tab. */
-async function injectPageScript(scripting, tabId) {
+function injectPageReader(scripting, tabId) {
+	return withTimeout(scripting.executeScript({
+		target: { tabId },
+		files: [PAGE_READER_FILE]
+	}), PAGE_INJECT_TIMEOUT_MS, "browser extension: page reader injection did not return before timeout");
+}
+/** Inject the idempotent MAIN-world probe controller for one inspect operation. */
+async function injectPageProbe(scripting, tabId) {
 	try {
 		await withTimeout(scripting.executeScript({
 			target: { tabId },
@@ -589,10 +596,6 @@ async function injectPageScript(scripting, tabId) {
 			world: "MAIN"
 		}), PAGE_INJECT_TIMEOUT_MS, "browser extension: page probe injection did not return before timeout");
 	} catch {}
-	return withTimeout(scripting.executeScript({
-		target: { tabId },
-		files: [PAGE_READER_FILE]
-	}), PAGE_INJECT_TIMEOUT_MS, "browser extension: page reader injection did not return before timeout");
 }
 /** Return whether one page-script answer is a current read response or classified failure. */
 function isCurrentReadResponse(value) {
@@ -623,11 +626,11 @@ async function requestPageScript(tabs, scripting, tabId, message, accepts, timeo
 		response = await askPageScript(tabs, tabId, message, timeoutMs);
 	} catch (error) {
 		if (!isMissingPageReader(error)) throw error;
-		await injectPageScript(scripting, tabId);
+		await injectPageReader(scripting, tabId);
 		return await askPageScript(tabs, tabId, message, timeoutMs);
 	}
 	if (accepts(response)) return response;
-	await injectPageScript(scripting, tabId);
+	await injectPageReader(scripting, tabId);
 	return await askPageScript(tabs, tabId, message, timeoutMs);
 }
 /** Read one resolved tab through its page content script. */
@@ -651,13 +654,14 @@ async function readActivePage(tabs, scripting, tabId) {
 	return readTabPage(tabs, scripting, await resolveReadTab(tabs, tabId));
 }
 /** Inspect Network/Console observations from one resolved tab. */
-async function inspectTabPage(tabs, scripting, tab, reset) {
+async function inspectTabPage(tabs, scripting, tab, mode) {
 	const normalized = normalizeTab(tab);
+	await injectPageProbe(scripting, normalized.id);
 	let response;
 	try {
 		response = await requestPageScript(tabs, scripting, normalized.id, {
 			kind: DSH_INSPECT_PAGE_KIND,
-			reset
+			mode
 		}, isCurrentInspectResponse);
 	} catch (error) {
 		if (!isPageAccessFailure(error) && !isMissingPageReader(error)) throw error;
@@ -668,8 +672,8 @@ async function inspectTabPage(tabs, scripting, tab, reset) {
 	return boundedInspect(normalized, response.content);
 }
 /** Inspect the requested tab, or the tab shown in the side panel. */
-async function inspectActivePage(tabs, scripting, tabId, reset) {
-	return inspectTabPage(tabs, scripting, await resolveReadTab(tabs, tabId), reset);
+async function inspectActivePage(tabs, scripting, tabId, mode) {
+	return inspectTabPage(tabs, scripting, await resolveReadTab(tabs, tabId), mode);
 }
 /** Execute one document-bound action in the tab shown by the side panel. */
 async function actOnActivePage(tabs, scripting, operation) {
@@ -715,7 +719,7 @@ async function waitForTabPage(tabs, scripting, tabId, operation) {
 			if (error instanceof ClassifiedBridgeError && error.code === "BROWSER_WAIT_TIMEOUT") throw error;
 			if (!isMissingPageReader(error) && !isPageAccessFailure(error)) throw error;
 			try {
-				await injectPageScript(scripting, tabId);
+				await injectPageReader(scripting, tabId);
 			} catch (injectError) {
 				lastError = injectError;
 			}
@@ -760,7 +764,7 @@ async function executeBridgeOperation(tabs, scripting, operation) {
 		};
 		case "inspect-page": return {
 			kind: "inspect-page",
-			inspect: await inspectActivePage(tabs, scripting, operation.tabId, operation.reset)
+			inspect: await inspectActivePage(tabs, scripting, operation.tabId, operation.mode)
 		};
 		case "click-page-element":
 		case "fill-page-element":

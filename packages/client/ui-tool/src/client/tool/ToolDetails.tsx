@@ -5,24 +5,27 @@ import { diffCardModel } from './models/diff-card-model.ts'
 import { readCardModel } from './models/read-card-model.ts'
 import { searchCardModel } from './models/search-card-model.ts'
 import { terminalBlockLabels, terminalCardModel } from './models/terminal-card-model.ts'
-import { resultText } from './models/tool-call-model.ts'
+import { resultImages, resultText } from './models/tool-call-model.ts'
 import { webCardModel } from './models/web-card-model.ts'
+import { ToolResultImages } from './components/ToolResultImages.tsx'
 import css from './ToolDetails.module.css'
 
 /** Pure details-body inputs; framework session seats stay at the slot boundary. */
 interface ToolDetailsContentProps {
   block: ToolDetailsProps['block']
   cwd?: ToolDetailsProps['cwd']
+  loadImage?: ToolDetailsProps['loadImage']
   t: ToolDetailsProps['t']
 }
 
 /**
  * Render the selected Tool call's structured output when its presentation
- * intent is known, otherwise preserve the flattened result text.
- * @param props - selected call slice, workspace root, and locale seat.
+ * intent is known, otherwise preserve the flattened result text and any
+ * image-block thumbnails.
+ * @param props - selected call slice, workspace root, image loader, and locale seat.
  * @returns the details output body.
  */
-export function ToolDetails({ block, cwd, t }: ToolDetailsContentProps) {
+export function ToolDetails({ block, cwd, loadImage, t }: ToolDetailsContentProps) {
   const terminal = terminalCardModel(block, cwd)
   if (terminal !== null) {
     return (
@@ -58,9 +61,18 @@ export function ToolDetails({ block, cwd, t }: ToolDetailsContentProps) {
     )
   }
   if (!('kind' in block)) return <div className={css.empty}>{t('details.running')}</div>
+  const images = resultImages(block)
+  const text = resultText(block)
   return (
-    <pre className={css.code} data-error={block.isError || undefined}>
-      {resultText(block)}
-    </pre>
+    <>
+      {loadImage !== undefined && images.length > 0 ? (
+        <ToolResultImages images={images} load={loadImage} t={t} className={css.resultImages} />
+      ) : null}
+      {text !== '' || images.length === 0 ? (
+        <pre className={css.code} data-error={block.isError || undefined}>
+          {text}
+        </pre>
+      ) : null}
+    </>
   )
 }

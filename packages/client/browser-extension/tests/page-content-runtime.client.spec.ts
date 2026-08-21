@@ -82,7 +82,10 @@ describe('page content reader', () => {
       kind: 'dsh-wait-page',
       operation: { condition: { kind: 'ready' }, timeoutMs: 50, stableMs: 0 },
     })).toBe(false)
-    expect(isInspectPageDomRequest({ kind: 'dsh-inspect-page', reset: false })).toBe(true)
+    expect(isInspectPageDomRequest({ kind: 'dsh-inspect-page', mode: 'start' })).toBe(true)
+    expect(isInspectPageDomRequest({ kind: 'dsh-inspect-page', mode: 'snapshot' })).toBe(true)
+    expect(isInspectPageDomRequest({ kind: 'dsh-inspect-page', mode: 'stop' })).toBe(true)
+    expect(isInspectPageDomRequest({ kind: 'dsh-inspect-page', reset: false })).toBe(false)
     expect(isInspectPageDomRequest({ kind: 'dsh-inspect-page' })).toBe(false)
   })
 
@@ -194,8 +197,8 @@ describe('page content reader', () => {
     installPageReader(runtime.api, vi.fn(), vi.fn(), vi.fn(), inspectPage)
     const sendResponse = vi.fn()
 
-    expect(runtime.listener()({ kind: 'dsh-inspect-page', reset: true }, {}, sendResponse)).toBe(true)
-    expect(inspectPage).toHaveBeenCalledWith(true)
+    expect(runtime.listener()({ kind: 'dsh-inspect-page', mode: 'stop' }, {}, sendResponse)).toBe(true)
+    expect(inspectPage).toHaveBeenCalledWith('stop')
     await vi.waitFor(() => {
       expect(sendResponse).toHaveBeenCalledWith({ ok: true, content })
     })

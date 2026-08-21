@@ -1,13 +1,18 @@
 // @vitest-environment jsdom
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readVisiblePage } from '../src/extension/page-reader.ts'
-import { resetDocumentIdentityForTests } from '../src/extension/page-document.ts'
+import { currentDocumentIdentity, resetDocumentIdentityForTests } from '../src/extension/page-document.ts'
 import { PageWaitError, waitForPage } from '../src/extension/page-waiter.ts'
 
 /** Replace the page body for one extraction assertion. */
 function setPage(html: string): void {
   document.body.innerHTML = html
+}
+
+/** Wait for queued MutationObserver callbacks. */
+function flushMutations(): Promise<void> {
+  return new Promise((resolve) => { setTimeout(resolve, 0) })
 }
 
 /** Give one element a layout box, which jsdom otherwise reports as empty. */
@@ -186,6 +191,25 @@ describe('current-page extraction', () => {
     expect(document.documentElement.getAttribute('data-dsh-page-id')).toBe(second.pageId)
   })
 
+  it('increments the snapshot revision only for the first external mutation after each read', async () => {
+    setPage('<p>初始正文</p>')
+    const first = readVisiblePage()
+
+    document.body.append(document.createElement('section'))
+    await flushMutations()
+    const changed = currentDocumentIdentity()
+    expect(changed.revision).toBe(first.revision + 1)
+
+    document.body.append(document.createElement('aside'))
+    await flushMutations()
+    expect(currentDocumentIdentity().revision).toBe(changed.revision)
+
+    const second = readVisiblePage()
+    document.body.append(document.createElement('footer'))
+    await flushMutations()
+    expect(currentDocumentIdentity().revision).toBe(second.revision + 1)
+  })
+
   it('reports viewport metrics, semantic context, ARIA state, and actual scroll containers', () => {
     setPage(`
       <main aria-label="案件详情">
@@ -299,6 +323,19 @@ describe('in-page wait conditions', () => {
     })
     expect(page.text).toContain('异步结果已到达')
     expect(page.pageId).toMatch(/^[0-9a-f-]{36}$/)
+  })
+
+  it('disconnects the stability observer after the wait returns', async () => {
+    setPage('<p>页面已加载</p>')
+    const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect')
+
+    await waitForPage({
+      condition: { kind: 'ready' },
+      timeoutMs: 200,
+      stableMs: 20,
+    })
+
+    expect(disconnect).toHaveBeenCalledTimes(1)
   })
 
   it('times out with the last observed document coordinates', async () => {

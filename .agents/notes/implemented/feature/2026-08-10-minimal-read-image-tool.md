@@ -30,4 +30,4 @@ Ship the smallest tool that loads an image into the next request's context, enti
 - A text-only route succeeds only while the separately installed automatic fallback is ready; without it the original refusal remains. The tool itself still owns no placeholder or transcription mechanism.
 - The route gate races a concurrent model switch; the Web host's image-aware switch guard covers its surface, and other front doors own their equivalent. Recorded as a tool-fs Known Limitation.
 - Repeated image results accumulate request-token cost until compaction; content addressing deduplicates bytes only.
-- The tool-result card renders the durable reference, not pixels; inline preview is deferred to the UI packages.
+- The Web conversation row and details panel render image-block pixels through the shared message-image gallery; the model-facing result still carries the metadata envelope plus the durable `ImageBlock`. Inline preview lives in [tool-result image preview](2026-08-20-tool-result-image-preview.md).

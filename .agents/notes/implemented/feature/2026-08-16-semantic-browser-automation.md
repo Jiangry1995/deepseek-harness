@@ -16,7 +16,7 @@ Page snapshots now carry three identities:
 
 - `pageId` is still regenerated on every read. Element refs are valid only for that snapshot.
 - `documentId` is an opaque random UUID that stays stable for the current document lifetime and changes after refresh, navigation, or document replacement. It is never a URL.
-- `revision` is a monotonic MutationObserver counter for that document lifetime. Reads do not increment it.
+- `revision` is a monotonic document-change counter. Each read arms one MutationObserver that increments it for the first subsequent non-protocol mutation and then disconnects; stability waits own a separate observer for their request lifetime.
 
 `read-page` accepts an optional `tabId`. When omitted, the extension still reads the current active web tab, preferring the side-panel header tab. Chrome-internal, extension, and unscriptable pages return `BROWSER_PAGE_ACCESS_DENIED`.
 

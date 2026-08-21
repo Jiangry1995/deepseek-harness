@@ -187,7 +187,7 @@
 			case "open-tab": return typeof value.url === "string" && typeof value.active === "boolean";
 			case "list-tabs": return true;
 			case "read-page": return value.tabId === void 0 || isSafeTabId(value.tabId);
-			case "inspect-page": return (value.tabId === void 0 || isSafeTabId(value.tabId)) && typeof value.reset === "boolean";
+			case "inspect-page": return (value.tabId === void 0 || isSafeTabId(value.tabId)) && (value.mode === "start" || value.mode === "snapshot" || value.mode === "stop");
 			case "click-page-element":
 			case "focus-page-element": return isPageId(value.pageId) && isPageRef(value.ref);
 			case "fill-page-element": return isPageId(value.pageId) && isPageRef(value.ref) && typeof value.value === "string" && value.value.length <= 1e4 && typeof value.submit === "boolean";
@@ -207,12 +207,18 @@
 	//#endregion
 	//#region lib/types/extension/page-document.js
 	/** Document lifetime identity and DOM revision tracking for the in-page script. */
+	/** Attribute carrying the latest page snapshot identity. */
 	const PAGE_ID_ATTRIBUTE = "data-dsh-page-id";
+	/** Attribute carrying one document-bound element reference. */
 	const PAGE_REF_ATTRIBUTE = "data-dsh-page-ref";
+	/** Attribute carrying the current document identity. */
 	const DOCUMENT_ID_ATTRIBUTE = "data-dsh-document-id";
 	let documentRevision = 0;
-	let revisionObserver;
-	/** Create a UUID in browsers with or without randomUUID(). */
+	let disposeRevisionObserver;
+	/**
+	* Create a UUID in browsers with or without randomUUID().
+	* @returns an opaque document, page, or request identity.
+	*/
 	function createOpaqueId() {
 		if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
 		const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -225,13 +231,28 @@
 	function isOwnProtocolMutation(mutation) {
 		return mutation.type === "attributes" && typeof mutation.attributeName === "string" && mutation.attributeName.startsWith("data-dsh-");
 	}
-	/** Increment the document revision when page content other than protocol marks changes. */
-	function observeDocumentRevisions(mutations) {
-		if (mutations.every(isOwnProtocolMutation)) return;
-		documentRevision += 1;
+	/**
+	* Observe document changes other than this extension's reference attributes.
+	* @param onChange - callback for each relevant mutation batch.
+	* @returns a disposer that disconnects the observer.
+	*/
+	function observeDocumentChanges(onChange) {
+		if (typeof MutationObserver !== "function") return () => {};
+		const observer = new MutationObserver((mutations) => {
+			if (!mutations.every(isOwnProtocolMutation)) onChange();
+		});
+		observer.observe(document.documentElement, {
+			subtree: true,
+			childList: true,
+			characterData: true,
+			attributes: true
+		});
+		return () => {
+			observer.disconnect();
+		};
 	}
 	/**
-	* Ensure the current document has a stable identity and a live revision observer.
+	* Ensure the current document has a stable identity.
 	* The identity survives reads of the same document and is replaced only when this
 	* page script is created for a new document.
 	* @returns the current document identity and revision.
@@ -243,19 +264,21 @@
 			document.documentElement.setAttribute(DOCUMENT_ID_ATTRIBUTE, documentId);
 			documentRevision = 0;
 		}
-		if (revisionObserver === void 0 && typeof MutationObserver === "function") {
-			revisionObserver = new MutationObserver(observeDocumentRevisions);
-			revisionObserver.observe(document.documentElement, {
-				subtree: true,
-				childList: true,
-				characterData: true,
-				attributes: true
-			});
-		}
 		return {
 			documentId,
 			revision: documentRevision
 		};
+	}
+	/** Arm the document revision for the first relevant mutation after a page snapshot. */
+	function armDocumentRevision() {
+		disposeRevisionObserver?.();
+		let dispose = () => {};
+		dispose = observeDocumentChanges(() => {
+			documentRevision += 1;
+			dispose();
+			if (disposeRevisionObserver === dispose) disposeRevisionObserver = void 0;
+		});
+		disposeRevisionObserver = dispose;
 	}
 	/**
 	* Return the current document identity without creating a new page snapshot.
@@ -706,7 +729,7 @@
 		}
 		for (const current of documents) collectInferredClickTargets(current.body, "", actions, referenceState, markTruncated);
 		const scrollTargets = collectScrollTargets(documents, referenceState, markTruncated);
-		return {
+		const page = {
 			pageId,
 			documentId: identity.documentId,
 			revision: identity.revision,
@@ -717,6 +740,8 @@
 			scrollTargets,
 			truncated
 		};
+		armDocumentRevision();
+		return page;
 	}
 	//#endregion
 	//#region lib/types/extension/page-actor.js
@@ -975,7 +1000,8 @@
 		const send = findComposerSubmitButton(element);
 		if (send !== void 0) return send;
 		const nested = [...element.querySelectorAll(COMPOSER_CONTROL_SELECTOR)].filter((candidate) => isActivationControl(candidate) && !REJECT_CONTROL_NAME.test(controlName(candidate)));
-		return nested.length === 1 ? nested[0] : element;
+		const only = nested[0];
+		return nested.length === 1 && only !== void 0 ? only : element;
 	}
 	/** Dispatch a pointer sequence then a native click so framework click and pointer handlers both run. */
 	function dispatchActivation(element) {
@@ -1342,17 +1368,17 @@
 	/** Wait until no further document revisions occur for the requested quiet period. */
 	async function waitUntilStable(stableMs, deadline) {
 		if (stableMs <= 0) return;
-		let lastRevision = currentDocumentIdentity().revision;
 		let quietSince = Date.now();
-		while (Date.now() < deadline) {
-			await delay(Math.min(50, Math.max(0, deadline - Date.now())));
-			const current = currentDocumentIdentity().revision;
-			if (current !== lastRevision) {
-				lastRevision = current;
-				quietSince = Date.now();
-				continue;
+		const stopObserving = observeDocumentChanges(() => {
+			quietSince = Date.now();
+		});
+		try {
+			while (Date.now() < deadline) {
+				await delay(Math.min(50, Math.max(0, deadline - Date.now())));
+				if (Date.now() - quietSince >= stableMs) return;
 			}
-			if (Date.now() - quietSince >= stableMs) return;
+		} finally {
+			stopObserving();
 		}
 	}
 	/** Yield for one bounded interval. */
@@ -1413,11 +1439,11 @@
 	};
 	/**
 	* Ask the MAIN-world probe for its current buffers.
-	* @param reset - whether to clear the MAIN-world buffers after this snapshot.
+	* @param mode - whether to start, read, or finish page observation.
 	* @param target - window used for CustomEvent exchange.
 	* @returns a protocol-valid inspect payload, hooked or not.
 	*/
-	function collectPageProbe(reset = false, target = window) {
+	function collectPageProbe(mode, target = window) {
 		const requestId = crypto.randomUUID();
 		return new Promise((resolve) => {
 			let settled = false;
@@ -1431,10 +1457,10 @@
 			/** Accept a MAIN-world snapshot that matches this request. */
 			const onSnapshot = (event) => {
 				const detail = event.detail;
-				if (detail?.requestId !== requestId || detail.hooked !== true) return;
+				if (detail.requestId !== requestId) return;
 				finish({
 					hooked: true,
-					hookedAt: detail.hookedAt,
+					...detail.hookedAt === void 0 ? {} : { hookedAt: detail.hookedAt },
 					network: detail.network,
 					console: detail.console,
 					omittedNetwork: detail.omittedNetwork,
@@ -1444,7 +1470,7 @@
 			target.addEventListener(PAGE_PROBE_SNAPSHOT_EVENT, onSnapshot);
 			const request = {
 				requestId,
-				reset
+				mode
 			};
 			target.dispatchEvent(new CustomEvent(PAGE_PROBE_REQUEST_EVENT, { detail: request }));
 			setTimeout(() => {
@@ -1491,7 +1517,7 @@
 	* @returns whether the dedicated inspect discriminator is present.
 	*/
 	function isInspectPageDomRequest(message) {
-		return typeof message === "object" && message !== null && "kind" in message && message.kind === "dsh-inspect-page" && "reset" in message && typeof message.reset === "boolean";
+		return typeof message === "object" && message !== null && "kind" in message && message.kind === "dsh-inspect-page" && "mode" in message && (message.mode === "start" || message.mode === "snapshot" || message.mode === "stop");
 	}
 	/** Map a thrown page-script error onto a stable bridge failure. */
 	function failurePayload(error) {
@@ -1547,7 +1573,7 @@
 					sendResponse(failurePayload(/* @__PURE__ */ new Error("browser extension: page inspector is unavailable")));
 					return false;
 				}
-				inspectPage(message.reset).then((content) => {
+				inspectPage(message.mode).then((content) => {
 					if (!isBridgePageInspectContent(content)) {
 						sendResponse(failurePayload(/* @__PURE__ */ new Error("browser extension: page script returned an invalid inspect result")));
 						return;

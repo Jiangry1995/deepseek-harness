@@ -108,7 +108,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'conversation\', () => ctx.slots.register(\n      { name: \'conversation\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-layout/src/client/index.ts:62',
+    source: 'packages/client/ui-layout/src/client/index.ts:65',
   },
   {
     key: 'conversation.chat.assistant-actions',
@@ -434,9 +434,11 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     doc: 'The body of the details panel for the tool call the user selected —\none occupant, so taking it means rendering every tool\'s output, not just\nthe ones you know. The owner passes a frozen `block` whose two lifecycle\nforms must both be handled: branch on `\'kind\' in block` (a settled\n`ToolResultNode` has it, a still-running call does not), and treat\n`cwd` as display-only, for shortening workspace-rooted paths.\nA per-tool renderer belongs in the keyed `tool.call.toolview` seat\ninstead; this one is the whole panel.',
     registerOptions: [],
     ownerProps: [
-      '/** Owner currency of the details panel\'s Tool output renderer. */\nexport interface DetailsToolOwnerProps {\n  /** Frozen selected call slice. */\n  block: ToolCallBlock\n  /** Session workspace root for card cwd and relative-path display. */\n  cwd?: string | undefined\n}',
+      '/** Owner currency of the details panel\'s Tool output renderer. */\nexport interface DetailsToolOwnerProps {\n  /** Frozen selected call slice. */\n  block: ToolCallBlock\n  /** Session workspace root for card cwd and relative-path display. */\n  cwd?: string | undefined\n  /** Resolve a session-authorized historical image for inline Tool-result display. */\n  loadImage: (attachment: ImageAttachmentRef) => Promise<string>\n}',
     ],
-    ownerPropsReferences: [],
+    ownerPropsReferences: [
+      'ImageAttachmentRef',
+    ],
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
@@ -1048,7 +1050,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'details\', () => ctx.slots.register(\n      { name: \'details\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-layout/src/client/index.ts:72',
+    source: 'packages/client/ui-layout/src/client/index.ts:75',
   },
   {
     key: 'root',
@@ -1477,19 +1479,21 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'shell.overlay\', () => ctx.slots.register(\n      { name: \'shell.overlay\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-layout/src/client/index.ts:83',
+    source: 'packages/client/ui-layout/src/client/index.ts:86',
   },
   {
     key: 'sidebar',
     kind: 'single',
     scope: 'root',
     summary: 'The whole left column.',
-    doc: 'The whole left column. OCCUPIED by ui-sidebar\'s SidebarRoot, which\ndeclares the workspace and settings seats inside it — registering here\nreplaces the navigation column outright rather than adding to it, and\nthe seats it declares disappear with it. To add something to the\nsidebar, register into one of those inner seats instead.\n\nThe occupant receives the frame\'s live column state (collapsed, width)\nand is expected to render the compact control rail while collapsed.',
+    doc: 'The whole left column. OCCUPIED by ui-sidebar\'s SidebarRoot, which\ndeclares the workspace and settings seats inside it — registering here\nreplaces the navigation column outright rather than adding to it, and\nthe seats it declares disappear with it. To add something to the\nsidebar, register into one of those inner seats instead.\n\nThe occupant receives the frame\'s live column state (collapsed, width,\nand an optional `surface` flag). Desktop collapsed still renders the\ncompact control rail. The Chrome side-panel iframe (`dsh-surface=\nside-panel`) passes `surface: \'side-panel\'` instead of a rail: the\ncolumn width is zero and chrome moves into a top bar + history drawer.',
     registerOptions: [],
     ownerProps: [
-      '/** Sidebar owner share: live column state from the frame\'s concession solve. */\nexport interface SidebarOwnerProps {\n  /** True when the sidebar is closed (the column renders the compact control rail). */\n  collapsed: boolean\n  /** Rendered column width in px (SIDEBAR_COLLAPSED when collapsed). */\n  width: number\n}',
+      '/** Sidebar owner share: live column state from the frame\'s concession solve. */\nexport interface SidebarOwnerProps {\n  /** True when the sidebar is closed (the column renders the compact control rail). */\n  collapsed: boolean\n  /** Rendered column width in px (SIDEBAR_COLLAPSED when collapsed; 0 in the side panel). */\n  width: number\n  /**\n   * Set only in the Chrome side-panel iframe. Omitted on the desktop shell so\n   * a narrow window still uses the collapsed rail rather than the plugin chrome.\n   */\n  surface?: \'side-panel\'\n}',
     ],
-    ownerPropsReferences: [],
+    ownerPropsReferences: [
+      'Omitted',
+    ],
     standardProps: [
       'useSessions: SnapshotSelectorHook<SessionListState>',
       'useWorkspaces: SnapshotSelectorHook<import(\'./workspaces/service.ts\').WorkspaceListState>',
@@ -1503,7 +1507,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'sidebar\', () => ctx.slots.register(\n      { name: \'sidebar\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-layout/src/client/index.ts:49',
+    source: 'packages/client/ui-layout/src/client/index.ts:52',
   },
   {
     key: 'sidebar.footer.action',
@@ -1644,9 +1648,10 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       },
     ],
     ownerProps: [
-      '/** Standard owner currency supplied to every atomic Tool view. */\nexport interface ToolCallOwnerProps {\n  /** Tool call identity, stable across running and settled forms. */\n  callId: string\n  /** Wire Tool name and keyed dispatch value. */\n  toolName: string\n  /** Frozen running call or settled result node. */\n  block: ToolCallBlock\n  /** Session workspace root for relative summaries. */\n  cwd?: string | undefined\n  /** Open a Tool argument path through the Host. */\n  openFile: (path: string) => void\n  /** Inspect this call in the trajectory view when available. */\n  inspect?: (() => void) | undefined\n}',
+      '/** Standard owner currency supplied to every atomic Tool view. */\nexport interface ToolCallOwnerProps {\n  /** Tool call identity, stable across running and settled forms. */\n  callId: string\n  /** Wire Tool name and keyed dispatch value. */\n  toolName: string\n  /** Frozen running call or settled result node. */\n  block: ToolCallBlock\n  /** Session workspace root for relative summaries. */\n  cwd?: string | undefined\n  /** Open a Tool argument path through the Host. */\n  openFile: (path: string) => void\n  /** Inspect this call in the trajectory view when available. */\n  inspect?: (() => void) | undefined\n  /**\n   * Resolve a session-authorized historical image for inline display.\n   * Absent leaves image blocks as omitted text with no thumbnail.\n   */\n  loadImage?: ((attachment: ImageAttachmentRef) => Promise<string>) | undefined\n}',
     ],
     ownerPropsReferences: [
+      'ImageAttachmentRef',
       'Wire',
     ],
     standardProps: [
@@ -1681,7 +1686,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'tool.call.toolview\', () => ctx.slots.register(\n      { name: \'tool.call.toolview\', key: \'<one key the owner dispatches>\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-tool/src/client/contract/slots.ts:23',
+    source: 'packages/client/ui-tool/src/client/contract/slots.ts:24',
   },
   {
     key: 'tool.view.cordis',

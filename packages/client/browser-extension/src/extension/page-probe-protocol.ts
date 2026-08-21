@@ -36,7 +36,7 @@ export interface PageProbeConsoleEntry {
 export interface PageProbeSnapshot {
   requestId: string
   hooked: true
-  hookedAt: number
+  hookedAt?: number
   network: PageProbeNetworkEntry[]
   console: PageProbeConsoleEntry[]
   omittedNetwork: number
@@ -46,5 +46,5 @@ export interface PageProbeSnapshot {
 /** Isolated-world request posted to the MAIN-world probe. */
 export interface PageProbeRequest {
   requestId: string
-  reset: boolean
+  mode: 'start' | 'snapshot' | 'stop'
 }

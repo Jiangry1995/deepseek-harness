@@ -9,6 +9,7 @@
 // The block union's defining home is runtime (fold-product types); this
 // contract only forwards it (type-definition authority stays with the layer
 // that produces the values).
+import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type { ToolCallBlock, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
 
 export type { ToolCallBlock } from '@deepseek-ai/dsh-client-runtime/client'
@@ -40,6 +41,9 @@ const TOOL_VARIANTS: Record<string, ToolRowVariant> = {
   // with its own title from TOOL_TITLES, not the generic `others` row.
   pwsh: 'bash',
   read: 'read',
+  // Image reads share the file-read family (path link, browse icon) and own
+  // the "Read image" title; pixels render from content image blocks, not a card.
+  read_image: 'read',
   web_fetch: 'read',
   web_search: 'search',
   grep: 'search',
@@ -66,6 +70,7 @@ const TOOL_TITLES: Record<string, string> = {
   cordis_stop: 'Stop Cordis Plugin',
   cordis_undefine: 'Remove Cordis Plugin',
   pwsh: 'Pwsh',
+  read_image: 'Read image',
 }
 
 /**
@@ -99,8 +104,9 @@ export interface ToolRowModel {
 
 /**
  * Flatten a settled result's content blocks to display text: text blocks
- * verbatim, other block shapes as pretty JSON. Empty content on a failed call
- * falls back to the structured error's `name: code` line.
+ * verbatim, image blocks omitted (they render as thumbnails), other block
+ * shapes as pretty JSON. Empty content on a failed call falls back to the
+ * structured error's `name: code` line.
  * @param node - the settled result node.
  * @returns the flattened result text (may be empty).
  */
@@ -108,12 +114,28 @@ export function resultText(node: ToolResultNode): string {
   const parts: string[] = []
   for (const block of node.content) {
     if (block.type === 'text') parts.push(block.text)
+    else if (block.type === 'image') continue
     else parts.push(JSON.stringify(block, null, 2))
   }
   if (parts.length === 0 && node.error !== undefined) {
     parts.push(`${node.error.name}: ${node.error.code}`)
   }
   return parts.join('\n')
+}
+
+/**
+ * Durable image attachments carried on a settled tool result. Image blocks
+ * already ride `ToolResultNode.content`; this extracts them for the row and
+ * details preview so pixels are not JSON-stringified.
+ * @param node - the settled result node.
+ * @returns attachment refs in content order; empty when the result has none.
+ */
+export function resultImages(node: ToolResultNode): readonly ImageAttachmentRef[] {
+  const images: ImageAttachmentRef[] = []
+  for (const block of node.content) {
+    if (block.type === 'image') images.push(block.attachment)
+  }
+  return images
 }
 
 function parseArgs(argsRaw: string): unknown {

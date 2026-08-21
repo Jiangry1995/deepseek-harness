@@ -15,6 +15,7 @@ import {
 import {
   PAGE_ID_ATTRIBUTE,
   PAGE_REF_ATTRIBUTE,
+  armDocumentRevision,
   createOpaqueId,
   ensureDocumentIdentity,
 } from './page-document.ts'
@@ -609,7 +610,7 @@ export function readVisiblePage(): BridgePageContent {
 
   const scrollTargets = collectScrollTargets(documents, referenceState, markTruncated)
 
-  return {
+  const page: BridgePageContent = {
     pageId,
     documentId: identity.documentId,
     revision: identity.revision,
@@ -620,4 +621,6 @@ export function readVisiblePage(): BridgePageContent {
     scrollTargets,
     truncated,
   }
+  armDocumentRevision()
+  return page
 }

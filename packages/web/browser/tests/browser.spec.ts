@@ -238,8 +238,8 @@ describe('BrowserService operation lifecycle', () => {
   it('routes inspect-page and returns the matching Network/Console snapshot', async () => {
     const { ctx, commands } = await harness()
     const lease = ctx.browser.connect('inspect-client', true)
-    const pending = ctx.browser.inspectPage({ tabId: 12, reset: true }, signal)
-    expect(commands[0]?.operation).toEqual({ kind: 'inspect-page', tabId: 12, reset: true })
+    const pending = ctx.browser.inspectPage({ tabId: 12, mode: 'stop' }, signal)
+    expect(commands[0]?.operation).toEqual({ kind: 'inspect-page', tabId: 12, mode: 'stop' })
     ctx.browser.complete({
       requestId: commands[0]!.requestId,
       clientId: lease.clientId,

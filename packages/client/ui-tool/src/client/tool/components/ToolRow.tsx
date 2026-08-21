@@ -2,16 +2,18 @@
 // 16px leading slot (state dot / tool icon, chevron on hover or expanded) + title +
 // separator dot + FILL-truncated summary, drawn through the shared
 // DisclosureRow chrome with the whole row as the expand toggle (click /
-// Enter / Space, icon→chevron hover preview). The collapsed row is always
+// Enter / Space, icon→chevron hover preview). The collapsed header is always
 // one line; every row with body, output, or a card material (terminal, diff,
 // read, search, web) is expandable; the summary stays inline while open.
-// The expanded body — an IN/OUT gutter-labeled card (figma 1249:35657) for
-// text input/output, the run_code program through CodeBlock, or a card
-// primitive (TerminalBlock, DiffBlock, ReadBlock, SearchBlock, WebBlock) for a
-// call that declared that render intent — lives in a max-height scroll
-// container so a long payload scrolls internally instead of taking over the
-// message flow. Every card kind starts collapsed, so a run of tool calls stays
-// scannable; the details panel is the single-call full-height reading surface.
+// Image-block thumbnails sit outside that disclosure so collapsing hides only
+// the envelope. The expanded body — an IN/OUT gutter-labeled card
+// (figma 1249:35657) for text input/output, the run_code program through
+// CodeBlock, or a card primitive (TerminalBlock, DiffBlock, ReadBlock,
+// SearchBlock, WebBlock) for a call that declared that render intent — lives
+// in a max-height scroll container so a long payload scrolls internally
+// instead of taking over the message flow. Every card kind starts collapsed,
+// so a run of tool calls stays scannable; the details panel is the
+// single-call full-height reading surface.
 // Expand state is component-local view state. File-tool summaries are path
 // links that open through the host (stopPropagation keeps the two gestures
 // independent); an error row's collapsed summary is the failure's first line in
@@ -29,6 +31,9 @@ import { CHAT_READ_MAX_LINES, type ReadCardModel } from '../models/read-card-mod
 import { CHAT_SEARCH_MAX_LINES, type SearchCardModel } from '../models/search-card-model.ts'
 import { terminalBlockLabels, type TerminalCardModel } from '../models/terminal-card-model.ts'
 import type { ToolRowState, ToolRowVariant } from '../models/tool-call-model.ts'
+import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+import type { ImageLoader } from '@deepseek-ai/dsh-client-ui-attachment'
+import { ToolResultImages } from './ToolResultImages.tsx'
 import css from './ToolRow.module.css'
 
 export interface ToolRowProps {
@@ -99,6 +104,14 @@ export interface ToolRowProps {
    * over the expanded body. Absent = no affordance.
    */
   inspect?: (() => void) | undefined
+  /**
+   * Durable image attachments from the settled result. Rendered as thumbnails
+   * outside the disclosure (visible while the envelope is collapsed) when
+   * `loadImage` is also present.
+   */
+  images?: readonly ImageAttachmentRef[] | undefined
+  /** Session-authorized image URL loader; absent skips the thumbnail gallery. */
+  loadImage?: ImageLoader | undefined
 }
 
 /** Leading-slot state substitution: the tool icon yields to the terminal state
@@ -145,6 +158,8 @@ export function ToolRow({
   filePath,
   onOpenFile,
   inspect,
+  images,
+  loadImage,
 }: ToolRowProps) {
   const [expanded, setExpanded] = useState(false)
   const terminalBody = terminal ?? null
@@ -153,9 +168,13 @@ export function ToolRow({
   const searchBody = search ?? null
   const webBody = web ?? null
   const outputText = output ?? null
+  const imagePreview = images !== undefined && images.length > 0 && loadImage !== undefined
+    ? { images, load: loadImage }
+    : null
   // A card replaces the text body; a call carries at most one card kind, so the
   // card props are mutually exclusive. Any of them, or a text body/output,
-  // makes the row expandable.
+  // makes the row expandable. Image previews stay outside the disclosure and
+  // do not by themselves make the envelope expand.
   const card = terminalBody ?? diffBody ?? readBody ?? searchBody ?? webBody
   const expandable = body !== null || outputText !== null || card !== null
   const open = expanded && expandable
@@ -302,6 +321,14 @@ export function ToolRow({
           )}
         </div>
       </DisclosureRow>
+      {imagePreview !== null && (
+        <ToolResultImages
+          images={imagePreview.images}
+          load={imagePreview.load}
+          t={t}
+          className={css.resultImages}
+        />
+      )}
     </div>
   )
 }

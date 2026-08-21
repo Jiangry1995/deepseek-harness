@@ -2080,7 +2080,7 @@ Source: [`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/
 
 ### `browser_inspect`
 
-Read recent page fetch/XHR requests and console messages from a browser tab. Native DevTools cannot be opened. Omit tabId to inspect the current active web tab. Request and response bodies are not returned. If the log is empty, trigger the page action and inspect again.
+Control a short-lived capture of page fetch/XHR requests and console messages. Call with mode=start before reproducing the page behavior, use snapshot for an intermediate read, and call stop for the final read and cleanup. Native DevTools cannot be opened. Request and response bodies are not returned.
 
 ```json
 {
@@ -2090,11 +2090,14 @@ Read recent page fetch/XHR requests and console messages from a browser tab. Nat
       "type": "number",
       "description": "Browser-assigned tab id to inspect without first activating it. Omit to inspect the current active web tab."
     },
-    "reset": {
-      "type": "boolean",
-      "description": "Clear the in-page buffers after this snapshot. Defaults to false."
+    "mode": {
+      "type": "string",
+      "description": "Observation lifecycle: start, snapshot, or stop."
     }
-  }
+  },
+  "required": [
+    "mode"
+  ]
 }
 ```
 
@@ -2191,7 +2194,7 @@ Source: [`packages/web/tool-browser/src/index.ts`](../packages/web/tool-browser/
 
 ### `browser_read_page`
 
-Read bounded visible text and current non-secret form values from a browser tab, including textarea and input values, scroll targets, and viewport metrics. Omit tabId to read the current active web tab. Password, file, hidden, one-time-code, and payment-secret controls are excluded.
+Read bounded visible text and current non-secret form values from a browser tab, including textarea and input values, scroll targets, and viewport metrics. Every new current-page reference requires a fresh read without tabId, even when conversation history contains a prior page snapshot. Omit tabId to read the current active web tab. Password, file, hidden, one-time-code, and payment-secret controls are excluded.
 
 ```json
 {

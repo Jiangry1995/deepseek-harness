@@ -2086,7 +2086,7 @@ todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为
 
 ### `browser_inspect`
 
-读取浏览器标签页最近的页面 fetch/XHR 请求和控制台消息。无法打开原生 DevTools。省略 tabId 则检查当前活动 web 标签。不返回请求和响应正文。如果日志为空，先触发页面动作再检查一次。
+控制页面 fetch/XHR 请求和 console 消息的短期捕获。复现页面行为前以 mode=start 调用，中间读取使用 snapshot，最终读取和清理使用 stop。无法打开原生 DevTools，也不返回请求或响应体。
 
 ```json
 {
@@ -2096,11 +2096,14 @@ todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为
       "type": "number",
       "description": "Browser-assigned tab id to inspect without first activating it. Omit to inspect the current active web tab."
     },
-    "reset": {
-      "type": "boolean",
-      "description": "Clear the in-page buffers after this snapshot. Defaults to false."
+    "mode": {
+      "type": "string",
+      "description": "Observation lifecycle: start, snapshot, or stop."
     }
-  }
+  },
+  "required": [
+    "mode"
+  ]
 }
 ```
 
@@ -2197,7 +2200,7 @@ todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为
 
 ### `browser_read_page`
 
-从浏览器标签页读取有界的可见文本和当前非敏感表单值，包括 textarea 与 input 值、滚动目标和视口指标。省略 tabId 时读取当前活动网页标签页。密码、文件、隐藏字段、一次性验证码和支付敏感信息控件均被排除。
+从浏览器标签页读取有界的可见文本和当前非敏感表单值，包括 textarea 与 input 值、滚动目标和视口指标。每次新消息指向当前页面时，即使对话历史已有页面快照，也必须不带 tabId 重新读取。省略 tabId 时读取当前活动网页标签页。密码、文件、隐藏字段、一次性验证码和支付敏感信息控件均被排除。
 
 ```json
 {

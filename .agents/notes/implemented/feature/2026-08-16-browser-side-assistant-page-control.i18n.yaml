@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-16-browser-side-assistant-page-control.md
-2026-08-16-browser-side-assistant-page-control.md: 61821ac9fbc8517772b8b23cee43e152d9217724
-2026-08-16-browser-side-assistant-page-control.zh.md: 74aedf429b0f196219b4497a9fc51fa9dadb0892
+2026-08-16-browser-side-assistant-page-control.md: ddba7fc86aa5104b49920b514255f4f5075e5409
+2026-08-16-browser-side-assistant-page-control.zh.md: 155d78925a54cd2a7f34db97a75c21237c1a6934

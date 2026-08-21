@@ -448,9 +448,13 @@ export function apply(ctx: Context): void {
       'conversation.details.tool': { kind: 'single', scope: 'session' },
     },
     store: chatStore,
-    inject: (): DetailsInjected => ({
-      closeDetails: () => { layout.closeDetails() },
-    }),
+    inject: (sessionId: SessionId): DetailsInjected => {
+      const conversation = concreteConversation(ctx)
+      return {
+        closeDetails: () => { layout.closeDetails() },
+        loadImage: attachment => conversation.resolveImage(sessionId, attachment),
+      }
+    },
   }, DetailsPanel)
 
 }

@@ -279,6 +279,13 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+/* Image-block thumbnails sit outside the disclosure (and outside the 150px
+   IN/OUT scroller) so collapsing hides only the envelope and a 240px
+   long-edge preview is not clipped; same column indent as the io card. */
+.resultImages {
+  margin: 8px 0 4px 4px;
+}
+
 /* In-row code renders at the smaller code size (12/18) via each primitive's
    rebindable content-font seam; standalone markdown code blocks keep 13/22. */
 .codeBody {

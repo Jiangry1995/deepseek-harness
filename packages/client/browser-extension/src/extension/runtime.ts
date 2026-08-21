@@ -272,7 +272,7 @@ const PAGE_INJECT_TIMEOUT_MS = 5_000
 
 /** Reader bundle injected into tabs that loaded before this extension generation. */
 const PAGE_READER_FILE = 'page-content.js'
-/** MAIN-world probe injected so fetch/XHR/console can be observed. */
+/** Dormant MAIN-world probe controller injected only for inspect operations. */
 const PAGE_PROBE_FILE = 'page-probe.js'
 
 /** Tab shown in the side-panel header; read-page prefers this over the Service Worker's window guess. */
@@ -345,7 +345,16 @@ function askPageScript(tabs: TabsApi, tabId: number, message: unknown, timeoutMs
 }
 
 /** Inject the current page-content generation into one existing tab. */
-async function injectPageScript(scripting: ScriptingApi, tabId: number): Promise<unknown> {
+function injectPageReader(scripting: ScriptingApi, tabId: number): Promise<unknown> {
+  return withTimeout(
+    scripting.executeScript({ target: { tabId }, files: [PAGE_READER_FILE] }),
+    PAGE_INJECT_TIMEOUT_MS,
+    'browser extension: page reader injection did not return before timeout',
+  )
+}
+
+/** Inject the idempotent MAIN-world probe controller for one inspect operation. */
+async function injectPageProbe(scripting: ScriptingApi, tabId: number): Promise<void> {
   try {
     await withTimeout(
       scripting.executeScript({
@@ -359,11 +368,6 @@ async function injectPageScript(scripting: ScriptingApi, tabId: number): Promise
   } catch {
     // Page CSP can block MAIN-world scripts. Inspect then reports hooked:false.
   }
-  return withTimeout(
-    scripting.executeScript({ target: { tabId }, files: [PAGE_READER_FILE] }),
-    PAGE_INJECT_TIMEOUT_MS,
-    'browser extension: page reader injection did not return before timeout',
-  )
 }
 
 /** Return whether one page-script answer is a current read response or classified failure. */
@@ -407,11 +411,11 @@ async function requestPageScript(
     response = await askPageScript(tabs, tabId, message, timeoutMs)
   } catch (error) {
     if (!isMissingPageReader(error)) throw error
-    await injectPageScript(scripting, tabId)
+    await injectPageReader(scripting, tabId)
     return await askPageScript(tabs, tabId, message, timeoutMs)
   }
   if (accepts(response)) return response
-  await injectPageScript(scripting, tabId)
+  await injectPageReader(scripting, tabId)
   return await askPageScript(tabs, tabId, message, timeoutMs)
 }
 
@@ -452,16 +456,17 @@ async function inspectTabPage(
   tabs: TabsApi,
   scripting: ScriptingApi,
   tab: chrome.tabs.Tab,
-  reset: boolean,
+  mode: 'start' | 'snapshot' | 'stop',
 ): Promise<BridgePageInspect> {
   const normalized = normalizeTab(tab)
+  await injectPageProbe(scripting, normalized.id)
   let response: unknown
   try {
     response = await requestPageScript(
       tabs,
       scripting,
       normalized.id,
-      { kind: DSH_INSPECT_PAGE_KIND, reset },
+      { kind: DSH_INSPECT_PAGE_KIND, mode },
       isCurrentInspectResponse,
     )
   } catch (error) {
@@ -482,9 +487,9 @@ async function inspectActivePage(
   tabs: TabsApi,
   scripting: ScriptingApi,
   tabId: number | undefined,
-  reset: boolean,
+  mode: 'start' | 'snapshot' | 'stop',
 ): Promise<BridgePageInspect> {
-  return inspectTabPage(tabs, scripting, await resolveReadTab(tabs, tabId), reset)
+  return inspectTabPage(tabs, scripting, await resolveReadTab(tabs, tabId), mode)
 }
 
 /** Execute one document-bound action in the tab shown by the side panel. */
@@ -553,7 +558,7 @@ async function waitForTabPage(
       if (error instanceof ClassifiedBridgeError && error.code === 'BROWSER_WAIT_TIMEOUT') throw error
       if (!isMissingPageReader(error) && !isPageAccessFailure(error)) throw error
       try {
-        await injectPageScript(scripting, tabId)
+        await injectPageReader(scripting, tabId)
       } catch (injectError) {
         lastError = injectError
       }
@@ -599,7 +604,7 @@ export async function executeBridgeOperation(
     case 'inspect-page':
       return {
         kind: 'inspect-page',
-        inspect: await inspectActivePage(tabs, scripting, operation.tabId, operation.reset),
+        inspect: await inspectActivePage(tabs, scripting, operation.tabId, operation.mode),
       }
     case 'click-page-element':
     case 'fill-page-element':

@@ -133,7 +133,7 @@
 	}
 	/** Match the shared protocol envelope and an expected message direction. */
 	function hasEnvelope(value, direction) {
-		return value.channel === "dsh-browser-extension" && value.version === 6 && value.direction === direction;
+		return value.channel === "dsh-browser-extension" && value.version === 7 && value.direction === direction;
 	}
 	/** Validate a normalized tab received across the isolated-world bridge. */
 	function isBridgeTab(value) {
@@ -247,7 +247,7 @@
 			case "open-tab": return typeof value.url === "string" && typeof value.active === "boolean";
 			case "list-tabs": return true;
 			case "read-page": return value.tabId === void 0 || isSafeTabId(value.tabId);
-			case "inspect-page": return (value.tabId === void 0 || isSafeTabId(value.tabId)) && typeof value.reset === "boolean";
+			case "inspect-page": return (value.tabId === void 0 || isSafeTabId(value.tabId)) && (value.mode === "start" || value.mode === "snapshot" || value.mode === "stop");
 			case "click-page-element":
 			case "focus-page-element": return isPageId(value.pageId) && isPageRef(value.ref);
 			case "fill-page-element": return isPageId(value.pageId) && isPageRef(value.ref) && typeof value.value === "string" && value.value.length <= 1e4 && typeof value.submit === "boolean";
@@ -340,7 +340,7 @@
 		const postReady = () => {
 			target.postMessage({
 				channel: BROWSER_EXTENSION_CHANNEL,
-				version: 6,
+				version: 7,
 				direction: "ready"
 			}, target.location.origin);
 		};
@@ -348,7 +348,7 @@
 		const postResponse = (requestId, response) => {
 			target.postMessage({
 				channel: BROWSER_EXTENSION_CHANNEL,
-				version: 6,
+				version: 7,
 				direction: "response",
 				requestId,
 				response
@@ -366,7 +366,7 @@
 			runtime.sendMessage(request).then((response) => {
 				const candidate = {
 					channel: BROWSER_EXTENSION_CHANNEL,
-					version: 6,
+					version: 7,
 					direction: "response",
 					requestId: request.requestId,
 					response

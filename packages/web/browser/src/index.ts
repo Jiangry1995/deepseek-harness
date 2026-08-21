@@ -439,23 +439,17 @@ export class BrowserService extends TypertRemoteService {
   }
 
   /**
-   * Read recent page fetch/XHR calls and console messages captured after the in-page probe was installed.
-   * Native DevTools cannot be opened; this is the inspect surface available to the assistant.
-   * @param requestOrSignal - optional tab identity and reset flag, or the caller AbortSignal for the active tab.
-   * @param signal - caller cancellation when the first argument is a request record.
+   * Start, snapshot, or stop bounded page fetch/XHR and console observation.
+   * Native DevTools cannot be opened, and observations begin only after a start request.
+   * @param request - observation mode and optional tab identity.
+   * @param signal - caller cancellation.
    * @returns the tab metadata and bounded Network/Console snapshot.
    */
   async inspectPage(
-    requestOrSignal: BrowserInspectPageRequest | AbortSignal,
-    signal?: AbortSignal,
+    request: BrowserInspectPageRequest,
+    signal: AbortSignal,
   ): Promise<BrowserPageInspect> {
-    if (isAbortSignal(requestOrSignal)) {
-      return this.inspectPage({}, requestOrSignal)
-    }
-    if (signal === undefined) {
-      throw fail('browser: inspect-page requires a cancellation signal', 'BROWSER_INVALID_REQUEST')
-    }
-    const spec = this.resolveInspectPage(requestOrSignal)
+    const spec = this.resolveInspectPage(request)
     const result = await this.invoke(spec, signal)
     if (result.kind !== 'inspect-page') throw fail('browser: internal inspect-page result mismatch', 'BROWSER_RESULT_KIND_MISMATCH')
     return result.inspect
@@ -463,14 +457,14 @@ export class BrowserService extends TypertRemoteService {
 
   /**
    * Validate and default one inspect-page request.
-   * @param request - optional tab identity and reset flag.
+   * @param request - observation mode and optional tab identity.
    * @returns a complete provider operation.
    */
   resolveInspectPage(request: BrowserInspectPageRequest): BrowserInspectPageSpec {
     if (request.tabId !== undefined) assertTabId(request.tabId)
     return {
       kind: 'inspect-page',
-      reset: request.reset === true,
+      mode: request.mode,
       ...(request.tabId === undefined ? {} : { tabId: request.tabId }),
     }
   }

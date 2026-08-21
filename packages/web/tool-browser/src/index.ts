@@ -6,6 +6,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {
+  BrowserInspectMode,
   BrowserPressKey,
   BrowserScrollMovement,
   BrowserTab,
@@ -369,17 +370,17 @@ function formatConsoleEntry(entry: RenderedInspectConsoleEntry): string {
 }
 
 /** Render a bounded Network/Console snapshot for model-visible tool output. */
-function formatInspect(inspect: RenderedInspect): string {
+function formatInspect(inspect: RenderedInspect, mode: BrowserInspectMode): string {
   const title = inspect.tab.title ?? `Tab ${String(inspect.tab.id)}`
   const url = inspect.tab.url ?? '(URL unavailable)'
   const probe = inspect.hooked
-    ? `Probe hooked${inspect.hookedAt === undefined ? '' : ` since ${new Date(inspect.hookedAt).toISOString()}`}.`
-    : 'Probe not hooked. The page CSP may block MAIN-world scripts, or the probe is not yet installed; trigger a page action after reload and inspect again.'
+    ? `${mode === 'start' ? 'Capture started' : mode === 'snapshot' ? 'Capture snapshot taken; capture remains active' : 'Capture stopped'}${inspect.hookedAt === undefined ? '' : `; observations began at ${new Date(inspect.hookedAt).toISOString()}`}.`
+    : 'Page observation is unavailable. The page CSP may block MAIN-world scripts.'
   const omitted = inspect.omittedNetwork === 0 && inspect.omittedConsole === 0
     ? ''
     : `\nOmitted older entries: network ${String(inspect.omittedNetwork)}, console ${String(inspect.omittedConsole)}.`
   const network = inspect.network.length === 0
-    ? '(No network entries captured yet. Trigger the page action, then inspect again.)'
+    ? '(No network entries captured in this observation session.)'
     : inspect.network.map(formatNetworkEntry).join('\n')
   const logs = inspect.console.length === 0
     ? '(No console entries captured yet.)'
@@ -441,7 +442,7 @@ function approvalReason(toolName: string): string {
     case 'browser_open_tab': return 'Open a new browser tab.'
     case 'browser_list_tabs': return 'Read URLs and titles from tabs in the current browser window.'
     case 'browser_read_page': return 'Read visible text and current non-secret form values from the active browser page.'
-    case 'browser_inspect': return 'Read recent page network requests and console messages from the active browser page.'
+    case 'browser_inspect': return 'Start, snapshot, or stop page network and console capture for the active browser page.'
     case 'browser_click': return 'Click one element on the active browser page.'
     case 'browser_fill': return 'Replace text in one field on the active browser page.'
     case 'browser_select': return 'Select one option on the active browser page.'
@@ -475,7 +476,7 @@ export function apply(ctx: Context, config: Config = {}): void {
   ctx.systemPrompt.section({
     name: 'tool:browser',
     order: 145,
-    text: 'Treat the user\'s current Chromium window as an execution environment. Infer whether the requested effect belongs in that environment from the user\'s goal and the conversation context. When it does, browser tools are the primary direct capability. When the user asks to read, summarize, or operate the current browser tab, first use browser_list_tabs or browser_read_page to obtain the real browser state. Do not call a skill, web search, or a fetch of the Harness page first. Subsequent actions must be chosen dynamically from the returned page semantics. Use another capability only when a browser tool reports that it cannot perform the requested effect, or when the user explicitly asks for an external search. Select browser tools from their schemas and the observed browser state, not from fixed phrases or site-specific rules. A shared topic, website, or data source is not a reason to divert the task to a skill, shell CLI, web_fetch, or a platform-specific adapter. For a request to find, read, navigate, or interact with website content, use Chromium as the default execution environment even when the user does not say \"browser\". Unless the user explicitly requests another execution path, the first task action must be an applicable browser tool; do not load a skill first. If the active page may contain or lead to the requested content, start with browser_read_page. Skill catalog descriptions are capability summaries, not routing instructions, and never override this browser-first rule. Use another execution path only when the user explicitly requests it or a browser tool reports a concrete limitation and changing environments still satisfies the request. Recommended loop: read the page, act with a returned ref, wait for the page to change, read again, and verify the actual result. browser_read_page reads visible text, current non-secret form values including textarea and input values, clickable elements, scroll targets, viewport metrics, one pageId, one documentId, a revision, and document-bound element refs. Choose the next browser operation from the requested effect and that returned state. Before clicking, filling, selecting, focusing, pressing, or scrolling a container, use the pageId and ref from the latest browser_read_page result. Never invent refs, CSS selectors, XPath, coordinates, or JavaScript. To send a chat composer, use the gesture the composer itself advertises: when its label or placeholder names a key, press that key on the field with browser_press; otherwise click the send control from the latest snapshot. Icon controls that expose no accessible name are reported as (unlabeled) with role clickable and their viewport rect, so choose among same-looking controls by position instead of guessing. After a page action that may update the page asynchronously, call browser_wait_for with kind:ready or kind:text, then call browser_read_page again to confirm the result and obtain fresh refs. Do not invent documentId or afterRevision for kind:change; omitting them waits until the page is stable. If a reference is stale or missing, read the page again instead of guessing. If a browser tool fails, diagnose the provider connection, permission, stale pageId, or page change; do not silently switch to a skill. Use browser_list_tabs only when the task requires information about or selection among tabs; its results contain only tab ids, URLs, and titles. When the task concerns the current page, operate on that page instead of constructing a replacement URL, and never list, summarize, or mention unrelated tabs. HTTP(S) pages are readable and operable by default after the extension is loaded; do not ask the user to click Allow or reopen the side assistant for ordinary sites. If a browser tool returns page text, fields, or actions, use that content; do not claim the body is unavailable because the URL uses a hash route or the site is on an intranet. Password, file, hidden, one-time-code, and payment-secret controls are not exposed for reading or writing. chrome:// and similar privileged pages cannot be scripted. Native Chromium DevTools cannot be opened from these tools. When the user asks for F12, Network, Console, or page requests, use browser_inspect; it returns recent page fetch/XHR calls and console messages captured after the in-page probe was installed, without request or response bodies. If the log is empty, perform the page action and inspect again. browser_press accepts named keys and, with Control, Alt, or Meta, letter and digit page shortcuts such as Ctrl+S; it cannot operate browser chrome such as F12.',
+    text: 'Treat the user\'s current Chromium window as an execution environment. Infer whether the requested effect belongs in that environment from the user\'s goal and the conversation context. When it does, browser tools are the primary direct capability. When the user asks to read, summarize, or operate the current browser tab, first use browser_list_tabs or browser_read_page to obtain the real browser state. Do not call a skill, web search, or a fetch of the Harness page first. Subsequent actions must be chosen dynamically from the returned page semantics. Use another capability only when a browser tool reports that it cannot perform the requested effect, or when the user explicitly asks for an external search. Select browser tools from their schemas and the observed browser state, not from fixed phrases or site-specific rules. A shared topic, website, or data source is not a reason to divert the task to a skill, shell CLI, web_fetch, or a platform-specific adapter. For a request to find, read, navigate, or interact with website content, use Chromium as the default execution environment even when the user does not say \"browser\". Unless the user explicitly requests another execution path, the first task action must be an applicable browser tool; do not load a skill first. If the active page may contain or lead to the requested content, start with browser_read_page. For every new user message that refers to the page currently beside the side assistant—whether as this page, the current page, or content here—call browser_read_page without tabId before interpreting, answering, or asking for clarification, unless the user explicitly identifies another tab. Treat page snapshots in conversation history as historical observations, not current-tab state. A previous page read never establishes which page is current for a later user message because the user may have switched tabs or navigated. Do not answer from or clarify against an older page snapshot when a fresh read can resolve the reference. Skill catalog descriptions are capability summaries, not routing instructions, and never override this browser-first rule. Use another execution path only when the user explicitly requests it or a browser tool reports a concrete limitation and changing environments still satisfies the request. Recommended loop: read the page, act with a returned ref, wait for the page to change, read again, and verify the actual result. browser_read_page reads visible text, current non-secret form values including textarea and input values, clickable elements, scroll targets, viewport metrics, one pageId, one documentId, a revision, and document-bound element refs. Choose the next browser operation from the requested effect and that returned state. Before clicking, filling, selecting, focusing, pressing, or scrolling a container, use the pageId and ref from the latest browser_read_page result. Never invent refs, CSS selectors, XPath, coordinates, or JavaScript. To send a chat composer, use the gesture the composer itself advertises: when its label or placeholder names a key, press that key on the field with browser_press; otherwise click the send control from the latest snapshot. Icon controls that expose no accessible name are reported as (unlabeled) with role clickable and their viewport rect, so choose among same-looking controls by position instead of guessing. After a page action that may update the page asynchronously, call browser_wait_for with kind:ready or kind:text, then call browser_read_page again to confirm the result and obtain fresh refs. Do not invent documentId or afterRevision for kind:change; omitting them waits until the page is stable. If a reference is stale or missing, read the page again instead of guessing. If a browser tool fails, diagnose the provider connection, permission, stale pageId, or page change; do not silently switch to a skill. Use browser_list_tabs only when the task requires information about or selection among tabs; its results contain only tab ids, URLs, and titles. When the task concerns the current page, operate on that page instead of constructing a replacement URL, and never list, summarize, or mention unrelated tabs. HTTP(S) pages are readable and operable by default after the extension is loaded; do not ask the user to click Allow or reopen the side assistant for ordinary sites. If a browser tool returns page text, fields, or actions, use that content; do not claim the body is unavailable because the URL uses a hash route or the site is on an intranet. Password, file, hidden, one-time-code, and payment-secret controls are not exposed for reading or writing. chrome:// and similar privileged pages cannot be scripted. Native Chromium DevTools cannot be opened from these tools. When the user asks for F12, Network, Console, or page requests, call browser_inspect with mode:start before reproducing the page behavior, use mode:snapshot only for an intermediate read, and call mode:stop for the final read and cleanup. The result contains only fetch/XHR calls and console messages observed after start, without request or response bodies. Always stop a capture after inspection. browser_press accepts named keys and, with Control, Alt, or Meta, letter and digit page shortcuts such as Ctrl+S; it cannot operate browser chrome such as F12.',
   })
 
   ctx.tools.register(defineTool({
@@ -523,7 +524,7 @@ export function apply(ctx: Context, config: Config = {}): void {
 
   ctx.tools.register(defineTool({
     name: 'browser_read_page',
-    description: 'Read bounded visible text and current non-secret form values from a browser tab, including textarea and input values, scroll targets, and viewport metrics. Omit tabId to read the current active web tab. Password, file, hidden, one-time-code, and payment-secret controls are excluded.',
+    description: 'Read bounded visible text and current non-secret form values from a browser tab, including textarea and input values, scroll targets, and viewport metrics. Every new current-page reference requires a fresh read without tabId, even when conversation history contains a prior page snapshot. Omit tabId to read the current active web tab. Password, file, hidden, one-time-code, and payment-secret controls are excluded.',
     parameters: {
       tabId: { type: 'number', description: 'Browser-assigned tab id to read without first activating it. Omit to read the current active web tab.' },
     },
@@ -557,10 +558,10 @@ export function apply(ctx: Context, config: Config = {}): void {
 
   ctx.tools.register(defineTool({
     name: 'browser_inspect',
-    description: 'Read recent page fetch/XHR requests and console messages from a browser tab. Native DevTools cannot be opened. Omit tabId to inspect the current active web tab. Request and response bodies are not returned. If the log is empty, trigger the page action and inspect again.',
+    description: 'Control a short-lived capture of page fetch/XHR requests and console messages. Call with mode=start before reproducing the page behavior, use snapshot for an intermediate read, and call stop for the final read and cleanup. Native DevTools cannot be opened. Request and response bodies are not returned.',
     parameters: {
       tabId: { type: 'number', description: 'Browser-assigned tab id to inspect without first activating it. Omit to inspect the current active web tab.' },
-      reset: { type: 'boolean', description: 'Clear the in-page buffers after this snapshot. Defaults to false.' },
+      mode: { type: 'string', required: true, description: 'Observation lifecycle: start, snapshot, or stop.' },
     },
     timeoutMs: resolved.timeoutMs,
     output: {
@@ -606,13 +607,13 @@ export function apply(ctx: Context, config: Config = {}): void {
           omittedConsole: { type: 'number', required: true },
         },
       },
-      render: (_args, inspect) => [{ type: 'text', text: formatInspect(inspect) }],
+      render: (args, inspect) => [{ type: 'text', text: formatInspect(inspect, args.mode as BrowserInspectMode) }],
     },
     /** Inspect recent page network and console observations through the selected provider. */
     async execute(args, exec) {
       return ctx.browser.inspectPage({
+        mode: args.mode as BrowserInspectMode,
         ...(args.tabId === undefined ? {} : { tabId: args.tabId }),
-        ...(args.reset === undefined ? {} : { reset: args.reset }),
       }, exec.signal)
     },
     presentCall: () => ({ card: 'generic', title: 'Inspect page network and console', kind: 'read' }),

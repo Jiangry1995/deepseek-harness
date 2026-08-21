@@ -189,19 +189,22 @@ export interface BrowserReadPageRequest {
   tabId?: number
 }
 
-/** Caller request for inspecting recent page network and console observations. */
+/** Lifecycle operation for one tab-scoped page observation session. */
+export type BrowserInspectMode = 'start' | 'snapshot' | 'stop'
+
+/** Caller request for controlling page network and console observation. */
 export interface BrowserInspectPageRequest {
   /** Browser-assigned tab identity; omitted to inspect the current active web tab. */
   tabId?: number
-  /** Whether to clear the in-page buffers after this snapshot. Defaults to false. */
-  reset?: boolean
+  /** Start, read, or finish the tab-scoped observation session. */
+  mode: BrowserInspectMode
 }
 
 /** Fully resolved inspect operation sent to the extension provider. */
 export interface BrowserInspectPageSpec {
   kind: 'inspect-page'
   tabId?: number
-  reset: boolean
+  mode: BrowserInspectMode
 }
 
 /** One observed page network call captured after the in-page probe was installed. */

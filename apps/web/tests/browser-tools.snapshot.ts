@@ -49,6 +49,10 @@ describe('browser tools in the shipped Web composition', () => {
     expect(browserPrompt).toContain('first use browser_list_tabs or browser_read_page')
     expect(browserPrompt).toContain('Do not call a skill, web search, or a fetch of the Harness page first')
     expect(browserPrompt).toContain('Recommended loop: read the page, act with a returned ref, wait for the page to change, read again, and verify the actual result')
+    expect(browserPrompt).toContain('For every new user message that refers to the page currently beside the side assistant')
+    expect(browserPrompt).toContain('A previous page read never establishes which page is current for a later user message')
+    expect(browserPrompt).toContain('call browser_inspect with mode:start')
+    expect(browserPrompt).toContain('Always stop a capture after inspection')
     expect(browserPrompt).not.toContain('百度')
     expect(browserPrompt).not.toContain('政务系统')
     expect(browserPrompt).not.toContain('twitter.com')
@@ -64,6 +68,10 @@ describe('browser tools in the shipped Web composition', () => {
       'browser_press',
     ]))
     expect(browserTools?.map(tool => tool.name)).not.toContain('browser_type')
+    expect(browserTools?.find(tool => tool.name === 'browser_inspect')?.parameters).toMatchObject({
+      required: ['mode'],
+      properties: { mode: { type: 'string' } },
+    })
 
     expect({
       prompt: browserPrompt,

@@ -20,12 +20,12 @@ const UNHOOKED: BridgePageInspectContent = {
 
 /**
  * Ask the MAIN-world probe for its current buffers.
- * @param reset - whether to clear the MAIN-world buffers after this snapshot.
+ * @param mode - whether to start, read, or finish page observation.
  * @param target - window used for CustomEvent exchange.
  * @returns a protocol-valid inspect payload, hooked or not.
  */
 export function collectPageProbe(
-  reset = false,
+  mode: 'start' | 'snapshot' | 'stop',
   target: Window = window,
 ): Promise<BridgePageInspectContent> {
   const requestId = crypto.randomUUID()
@@ -41,10 +41,10 @@ export function collectPageProbe(
     /** Accept a MAIN-world snapshot that matches this request. */
     const onSnapshot = (event: Event) => {
       const detail = (event as CustomEvent<PageProbeSnapshot>).detail
-      if (detail?.requestId !== requestId || detail.hooked !== true) return
+      if (detail.requestId !== requestId) return
       finish({
         hooked: true,
-        hookedAt: detail.hookedAt,
+        ...(detail.hookedAt === undefined ? {} : { hookedAt: detail.hookedAt }),
         network: detail.network,
         console: detail.console,
         omittedNetwork: detail.omittedNetwork,
@@ -52,7 +52,7 @@ export function collectPageProbe(
       })
     }
     target.addEventListener(PAGE_PROBE_SNAPSHOT_EVENT, onSnapshot)
-    const request: PageProbeRequest = { requestId, reset }
+    const request: PageProbeRequest = { requestId, mode }
     target.dispatchEvent(new CustomEvent(PAGE_PROBE_REQUEST_EVENT, { detail: request }))
     setTimeout(() => { finish(UNHOOKED) }, PAGE_PROBE_SNAPSHOT_TIMEOUT_MS)
   })

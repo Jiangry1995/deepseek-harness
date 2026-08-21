@@ -433,15 +433,15 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the tab metadata and its main-frame page snapshot.',
       },
       {
-        signature: 'async inspectPage( requestOrSignal: BrowserInspectPageRequest | AbortSignal, signal?: AbortSignal, ): Promise<BrowserPageInspect>',
-        description: 'Read recent page fetch/XHR calls and console messages captured after the in-page probe was installed. Native DevTools cannot be opened; this is the inspect surface available to the assistant.',
-        parameters: [{ name: 'requestOrSignal', description: 'optional tab identity and reset flag, or the caller AbortSignal for the active tab.' }, { name: 'signal', description: 'caller cancellation when the first argument is a request record.' }],
+        signature: 'async inspectPage( request: BrowserInspectPageRequest, signal: AbortSignal, ): Promise<BrowserPageInspect>',
+        description: 'Start, snapshot, or stop bounded page fetch/XHR and console observation. Native DevTools cannot be opened, and observations begin only after a start request.',
+        parameters: [{ name: 'request', description: 'observation mode and optional tab identity.' }, { name: 'signal', description: 'caller cancellation.' }],
         returns: 'the tab metadata and bounded Network/Console snapshot.',
       },
       {
         signature: 'resolveInspectPage(request: BrowserInspectPageRequest): BrowserInspectPageSpec',
         description: 'Validate and default one inspect-page request.',
-        parameters: [{ name: 'request', description: 'optional tab identity and reset flag.' }],
+        parameters: [{ name: 'request', description: 'observation mode and optional tab identity.' }],
         returns: 'a complete provider operation.',
       },
       {
@@ -3049,12 +3049,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface BrowserFillPageSpec extends BrowserPageTarget {\n    kind: \'fill-page-element\';\n    value: string;\n    submit: boolean;\n}',
   },
   {
+    name: 'BrowserInspectMode',
+    declaration: 'export type BrowserInspectMode = \'start\' | \'snapshot\' | \'stop\';',
+  },
+  {
     name: 'BrowserInspectPageRequest',
-    declaration: 'export interface BrowserInspectPageRequest {\n    tabId?: number;\n    reset?: boolean;\n}',
+    declaration: 'export interface BrowserInspectPageRequest {\n    tabId?: number;\n    mode: BrowserInspectMode;\n}',
   },
   {
     name: 'BrowserInspectPageSpec',
-    declaration: 'export interface BrowserInspectPageSpec {\n    kind: \'inspect-page\';\n    tabId?: number;\n    reset: boolean;\n}',
+    declaration: 'export interface BrowserInspectPageSpec {\n    kind: \'inspect-page\';\n    tabId?: number;\n    mode: BrowserInspectMode;\n}',
   },
   {
     name: 'BrowserNetworkEntry',
@@ -3082,7 +3086,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'BrowserPageAction',
-    declaration: 'export interface BrowserPageAction {\n    ref: BrowserPageElementRef;\n    role: string;\n    label: string;\n    disabled: boolean;\n    inViewport: boolean;\n    focused: boolean;\n    context?: string;\n    href?: string;\n    checked?: boolean;\n    selected?: boolean;\n    expanded?: boolean;\n    pressed?: boolean;\n}',
+    declaration: 'export interface BrowserPageAction {\n    ref: BrowserPageElementRef;\n    role: string;\n    label: string;\n    rect?: {\n        x: number;\n        y: number;\n        width: number;\n        height: number;\n    };\n    accent?: boolean;\n    disabled: boolean;\n    inViewport: boolean;\n    focused: boolean;\n    context?: string;\n    href?: string;\n    checked?: boolean;\n    selected?: boolean;\n    expanded?: boolean;\n    pressed?: boolean;\n}',
   },
   {
     name: 'BrowserPageActionReceipt',

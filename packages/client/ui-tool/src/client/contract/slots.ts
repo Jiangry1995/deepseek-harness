@@ -1,4 +1,5 @@
 /** Tool UI slot declarations and their composed component props. */
+import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type { PropsLocale, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallBlock } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -38,6 +39,11 @@ export interface ToolCallOwnerProps {
   openFile: (path: string) => void
   /** Inspect this call in the trajectory view when available. */
   inspect?: (() => void) | undefined
+  /**
+   * Resolve a session-authorized historical image for inline display.
+   * Absent leaves image blocks as omitted text with no thumbnail.
+   */
+  loadImage?: ((attachment: ImageAttachmentRef) => Promise<string>) | undefined
 }
 
 /** Full props of a registered atomic Tool view. */

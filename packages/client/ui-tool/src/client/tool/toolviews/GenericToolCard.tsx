@@ -14,7 +14,7 @@ import { diffCardModel } from '../models/diff-card-model.ts'
 import { searchCardModel } from '../models/search-card-model.ts'
 import { terminalCardModel, terminalFailed } from '../models/terminal-card-model.ts'
 import { webCardModel } from '../models/web-card-model.ts'
-import { toolRowModel, type ToolRowVariant } from '../models/tool-call-model.ts'
+import { toolRowModel, resultImages, type ToolRowVariant } from '../models/tool-call-model.ts'
 import { ToolRow } from '../components/ToolRow.tsx'
 
 /** Variant leading icons (figma table); all glyphs render at 14 inside the 16px leading box. */
@@ -33,13 +33,14 @@ export interface GenericToolCardProps extends ToolCallOwnerProps {
   t: ToolTreeProps['t']
 }
 
-export function GenericToolCard({ toolName, block, cwd, openFile, inspect, t }: GenericToolCardProps) {
+export function GenericToolCard({ toolName, block, cwd, openFile, inspect, loadImage, t }: GenericToolCardProps) {
   const model = toolRowModel(toolName, block, cwd)
   const terminal = terminalCardModel(block, cwd)
   const read = readCardModel(block, cwd)
   const diff = diffCardModel(block)
   const search = searchCardModel(block)
   const web = webCardModel(block)
+  const images = 'kind' in block ? resultImages(block) : []
   // A failing exit status is the terminal card's own error signal (the call
   // itself settles isError:false), surfaced as the row's red state dot.
   const state = model.state === 'ok' && terminal !== null && terminalFailed(terminal)
@@ -72,6 +73,8 @@ export function GenericToolCard({ toolName, block, cwd, openFile, inspect, t }: 
       filePath={model.filePath}
       onOpenFile={singleFile ? openFile : undefined}
       inspect={inspect}
+      images={images}
+      loadImage={loadImage}
     />
   )
 }

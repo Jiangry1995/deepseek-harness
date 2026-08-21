@@ -2,11 +2,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 
+import { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { RunningToolCall, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { resolveWorkspacePath } from '@deepseek-ai/dsh-client-runtime/client'
-import { classifyTool, resultText, toolRowModel } from '../src/client/tool/models/tool-call-model.ts'
+import { classifyTool, resultImages, resultText, toolRowModel } from '../src/client/tool/models/tool-call-model.ts'
 import { ToolRow } from '../src/client/tool/components/ToolRow.tsx'
 import { GenericToolCard, type GenericToolCardProps } from '../src/client/tool/toolviews/GenericToolCard.tsx'
 import { zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
@@ -35,6 +36,7 @@ describe('tool-call-model', () => {
     expect(classifyTool('bash')).toBe('bash')
     expect(classifyTool('pwsh')).toBe('bash')
     expect(classifyTool('read')).toBe('read')
+    expect(classifyTool('read_image')).toBe('read')
     expect(classifyTool('web_fetch')).toBe('read')
     expect(classifyTool('web_search')).toBe('search')
     expect(classifyTool('grep')).toBe('search')
@@ -149,13 +151,47 @@ describe('tool-call-model', () => {
       .toBe('{\n  "code": ""\n}')
   })
 
-  it('resultText flattens text blocks verbatim, other shapes as JSON, empty error content to name: code', () => {
+  it('resultText flattens text blocks verbatim, skips image blocks, other shapes as JSON, empty error content to name: code', () => {
     expect(resultText(result({ content: [{ type: 'text', text: 'a\nb' }] }))).toBe('a\nb')
     expect(resultText(result({ content: [{ type: 'text', text: 'a' }, { type: 'image', data: 'x' } as never] })))
-      .toBe(`a\n${JSON.stringify({ type: 'image', data: 'x' }, null, 2)}`)
+      .toBe('a')
+    expect(resultText(result({ content: [{ type: 'text', text: 'a' }, { type: 'reasoning', text: 'x' }] })))
+      .toBe(`a\n${JSON.stringify({ type: 'reasoning', text: 'x' }, null, 2)}`)
     expect(resultText(result({ content: [], isError: true, error: { name: 'ToolError', code: 'denied' } })))
       .toBe('ToolError: denied')
     expect(resultText(result({ content: [] }))).toBe('')
+  })
+
+  it('resultImages collects durable attachments in content order and ignores text', () => {
+    const shot = {
+      attachmentId: AttachmentId(`sha256:${'a'.repeat(64)}`),
+      mediaType: 'image/png' as const,
+      bytes: 68,
+      width: 1920,
+      height: 1080,
+      name: 'shot.png',
+    }
+    expect(resultImages(result({ content: [{ type: 'text', text: 'meta' }] }))).toEqual([])
+    expect(resultImages(result({
+      content: [
+        { type: 'text', text: 'meta' },
+        { type: 'image', attachment: shot },
+        { type: 'image', attachment: { ...shot, name: 'second.png' } },
+      ],
+    }))).toEqual([shot, { ...shot, name: 'second.png' }])
+  })
+
+  it('names a read_image row Read image and treats file_path as an openable file', () => {
+    const model = toolRowModel('read_image', result({
+      call: { name: 'read_image', argsRaw: '{"file_path":"C:\\\\Temp\\\\shot.png"}' },
+      content: [{ type: 'text', text: '<path>shot.png</path>' }],
+    }))
+    expect(model).toMatchObject({
+      variant: 'read',
+      title: 'Read image',
+      summary: 'C:\\Temp\\shot.png',
+      filePath: 'C:\\Temp\\shot.png',
+    })
   })
 
   it('derives output from the settled result and null while running or blank', () => {

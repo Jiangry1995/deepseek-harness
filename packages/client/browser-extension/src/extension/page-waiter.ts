@@ -1,7 +1,7 @@
 /** In-page wait conditions for document change, text, URL, and load stability. */
 
 import type { BridgePageContent, BridgeWaitPageDomOperation } from '../protocol.ts'
-import { currentDocumentIdentity } from './page-document.ts'
+import { currentDocumentIdentity, observeDocumentChanges } from './page-document.ts'
 import { readVisiblePage } from './page-reader.ts'
 
 /** Stable wait failure that includes the last observed document coordinates. */
@@ -64,17 +64,15 @@ function conditionHolds(operation: BridgeWaitPageDomOperation): boolean {
 /** Wait until no further document revisions occur for the requested quiet period. */
 async function waitUntilStable(stableMs: number, deadline: number): Promise<void> {
   if (stableMs <= 0) return
-  let lastRevision = currentDocumentIdentity().revision
   let quietSince = Date.now()
-  while (Date.now() < deadline) {
-    await delay(Math.min(50, Math.max(0, deadline - Date.now())))
-    const current = currentDocumentIdentity().revision
-    if (current !== lastRevision) {
-      lastRevision = current
-      quietSince = Date.now()
-      continue
+  const stopObserving = observeDocumentChanges(() => { quietSince = Date.now() })
+  try {
+    while (Date.now() < deadline) {
+      await delay(Math.min(50, Math.max(0, deadline - Date.now())))
+      if (Date.now() - quietSince >= stableMs) return
     }
-    if (Date.now() - quietSince >= stableMs) return
+  } finally {
+    stopObserving()
   }
 }
 

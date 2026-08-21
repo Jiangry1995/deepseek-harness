@@ -1,4 +1,4 @@
-/** MAIN-world fetch/XHR/console probe. Installed at document_start so later page scripts are wrapped. */
+/** Dormant MAIN-world controller for short-lived fetch/XHR/console observation. */
 
 import {
   PAGE_PROBE_CONSOLE_MAX,
@@ -8,7 +8,6 @@ import {
   PAGE_PROBE_TEXT_MAX,
   type PageProbeConsoleEntry,
   type PageProbeNetworkEntry,
-  type PageProbeRequest,
   type PageProbeSnapshot,
 } from './page-probe-protocol.ts'
 
@@ -21,7 +20,22 @@ type ProbeTarget = typeof globalThis & { [INSTALLED]?: true }
 interface XhrMeta {
   method: string
   url: string
-  startedAt: number
+}
+
+interface ConsolePatch {
+  level: 'log' | 'info' | 'warn' | 'error' | 'debug'
+  original: (...args: unknown[]) => void
+  patched: (...args: unknown[]) => void
+}
+
+interface ProbeInstallation {
+  originalFetch: typeof fetch
+  patchedFetch: typeof fetch
+  originalOpen: typeof XMLHttpRequest.prototype.open
+  patchedOpen: typeof XMLHttpRequest.prototype.open
+  originalSend: typeof XMLHttpRequest.prototype.send
+  patchedSend: typeof XMLHttpRequest.prototype.send
+  consolePatches: ConsolePatch[]
 }
 
 /**
@@ -34,20 +48,49 @@ function clip(value: string): string {
 }
 
 /**
- * Render console arguments without throwing on cyclic values.
+ * Convert one diagnostic value without enumerating page-owned objects.
+ * @param value - console argument, rejection reason, or fetch error.
+ * @returns bounded primitive text or a fixed object category.
+ */
+function inspectValue(value: unknown): string {
+  if (value === null) return 'null'
+  switch (typeof value) {
+    case 'string': return clip(value)
+    case 'undefined': return 'undefined'
+    case 'boolean': return value ? 'true' : 'false'
+    case 'number': return String(value)
+    case 'bigint': return `${String(value)}n`
+    case 'symbol': return clip(String(value))
+    case 'function': return '[Function]'
+    case 'object': {
+      try {
+        if (value instanceof Error) {
+          try {
+            return clip(`${value.name || 'Error'}: ${value.message}`)
+          } catch {
+            return '[Error]'
+          }
+        }
+      } catch {
+        return '[Object]'
+      }
+      try {
+        return Array.isArray(value) ? '[Array]' : '[Object]'
+      } catch {
+        return '[Object]'
+      }
+    }
+  }
+  return '[Unknown]'
+}
+
+/**
+ * Render console arguments without retaining or traversing page-owned objects.
  * @param args - console arguments.
  * @returns one bounded line.
  */
 function renderConsoleArgs(args: unknown[]): string {
-  return clip(args.map((arg) => {
-    if (typeof arg === 'string') return arg
-    if (arg instanceof Error) return arg.message
-    try {
-      return JSON.stringify(arg) ?? String(arg)
-    } catch {
-      return String(arg)
-    }
-  }).join(' '))
+  return clip(args.map(inspectValue).join(' '))
 }
 
 /**
@@ -81,30 +124,30 @@ function describeFetchInput(input: unknown, init: RequestInit | undefined): { me
   const request = input instanceof Request ? input : undefined
   const url = typeof input === 'string'
     ? input
-    : request?.url ?? (typeof input === 'object' && input !== null && 'url' in input ? String((input as { url: unknown }).url) : String(input))
+    : request?.url ?? (typeof input === 'object' && input !== null && 'url' in input ? String(input.url) : String(input))
   const method = init?.method ?? request?.method ?? 'GET'
-  return { method: clip(String(method).toUpperCase() || 'GET'), url: sanitizeUrl(url) }
+  return { method: clip(method.toUpperCase() || 'GET'), url: sanitizeUrl(url) }
 }
 
-/** Install the page probe once per document. */
+/**
+ * Install one dormant page-probe controller for the current document.
+ * @param target - MAIN-world global whose page APIs are observed during an active capture.
+ */
 export function installPageProbe(target: ProbeTarget = globalThis): void {
   if (target[INSTALLED] === true) return
   target[INSTALLED] = true
 
-  const hookedAt = Date.now()
   const network: PageProbeNetworkEntry[] = []
   const consoleEntries: PageProbeConsoleEntry[] = []
+  const xhrMeta = new WeakMap<XMLHttpRequest, XhrMeta>()
   let omittedNetwork = 0
   let omittedConsole = 0
-  const xhrMeta = new WeakMap<XMLHttpRequest, XhrMeta>()
+  let hookedAt: number | undefined
+  let captureGeneration = 0
+  let active = false
+  let installation: ProbeInstallation | undefined
 
-  /**
-   * Push one entry into a bounded ring buffer.
-   * @param list - destination buffer.
-   * @param entry - new observation.
-   * @param max - retained count.
-   * @param omitted - callback when an older entry is dropped.
-   */
+  /** Push one entry into a bounded ring buffer. */
   function push<T>(list: T[], entry: T, max: number, omitted: () => void): void {
     list.push(entry)
     while (list.length > max) {
@@ -125,105 +168,180 @@ export function installPageProbe(target: ProbeTarget = globalThis): void {
     })
   }
 
-  const originalFetch = target.fetch.bind(target)
-  target.fetch = async function patchedFetch(
-    input: RequestInfo | URL,
-    init?: RequestInit,
-  ): Promise<Response> {
-    const described = describeFetchInput(input, init)
-    const startedAt = Date.now()
-    try {
-      const response = await originalFetch(input, init)
-      recordNetwork({
-        at: Date.now(),
-        source: 'fetch',
-        method: described.method,
-        url: described.url,
-        status: response.status,
-        ok: response.ok,
-        durationMs: Date.now() - startedAt,
-      })
-      return response
-    } catch (error) {
-      recordNetwork({
-        at: Date.now(),
-        source: 'fetch',
-        method: described.method,
-        url: described.url,
-        durationMs: Date.now() - startedAt,
-        error: clip(error instanceof Error ? error.message : String(error)),
-      })
-      throw error
-    }
+  /** Clear retained observations before a new capture session. */
+  function clear(): void {
+    network.length = 0
+    consoleEntries.length = 0
+    omittedNetwork = 0
+    omittedConsole = 0
   }
 
-  const originalOpen = XMLHttpRequest.prototype.open
-  const originalSend = XMLHttpRequest.prototype.send
-  XMLHttpRequest.prototype.open = function patchedOpen(
-    method: string,
-    url: string | URL,
-    ...rest: unknown[]
-  ): void {
-    xhrMeta.set(this, {
-      method: clip(String(method).toUpperCase() || 'GET'),
-      url: sanitizeUrl(String(url)),
-      startedAt: 0,
-    })
-    originalOpen.apply(this, [method, url, ...rest] as Parameters<XMLHttpRequest['open']>)
-  }
-  XMLHttpRequest.prototype.send = function patchedSend(body?: Document | XMLHttpRequestBodyInit | null): void {
-    const meta = xhrMeta.get(this)
-    if (meta !== undefined) meta.startedAt = Date.now()
-    this.addEventListener('loadend', () => {
-      if (meta === undefined) return
-      const failed = this.status === 0 && this.readyState === XMLHttpRequest.DONE
-      recordNetwork({
-        at: Date.now(),
-        source: 'xhr',
-        method: meta.method,
-        url: meta.url,
-        ...(failed ? {} : { status: this.status, ok: this.status >= 200 && this.status < 300 }),
-        durationMs: Date.now() - meta.startedAt,
-        ...(failed ? { error: clip(this.statusText || 'network error') } : {}),
-      })
-    })
-    originalSend.call(this, body)
-  }
-
-  for (const level of ['log', 'info', 'warn', 'error', 'debug'] as const) {
-    const original = target.console[level].bind(target.console)
-    target.console[level] = (...args: unknown[]) => {
-      recordConsole(level, renderConsoleArgs(args))
-      original(...args)
-    }
-  }
-
-  target.addEventListener('error', (event) => {
+  /** Record one uncaught page error while capture is active. */
+  function onError(event: ErrorEvent): void {
+    if (!active) return
     recordConsole('error', clip(event.message || 'uncaught error'))
-  })
-  target.addEventListener('unhandledrejection', (event) => {
-    const reason = event.reason instanceof Error ? event.reason.message : String(event.reason)
-    recordConsole('error', clip(`unhandledrejection ${reason}`))
-  })
+  }
 
-  target.addEventListener(PAGE_PROBE_REQUEST_EVENT, (event) => {
-    const detail = (event as CustomEvent<PageProbeRequest>).detail
-    const snapshot: PageProbeSnapshot = {
-      requestId: typeof detail?.requestId === 'string' ? detail.requestId : '',
+  /** Record one unhandled rejection while capture is active. */
+  function onUnhandledRejection(event: PromiseRejectionEvent): void {
+    if (!active) return
+    recordConsole('error', clip(`unhandledrejection ${inspectValue(event.reason)}`))
+  }
+
+  /** Start a fresh capture and install wrappers around the methods currently owned by the page. */
+  function start(): void {
+    if (active) stop()
+    clear()
+    captureGeneration += 1
+    hookedAt = Date.now()
+    active = true
+    const generation = captureGeneration
+    const originalFetch = target.fetch
+    const patchedFetch: typeof fetch = function patchedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+      if (!active || generation !== captureGeneration) return Reflect.apply(originalFetch, target, [input, init])
+      const described = describeFetchInput(input, init)
+      const startedAt = Date.now()
+      return Reflect.apply(originalFetch, target, [input, init]).then((response) => {
+        if (active && generation === captureGeneration) {
+          recordNetwork({
+            at: Date.now(),
+            source: 'fetch',
+            method: described.method,
+            url: described.url,
+            status: response.status,
+            ok: response.ok,
+            durationMs: Date.now() - startedAt,
+          })
+        }
+        return response
+      }, (error: unknown) => {
+        if (active && generation === captureGeneration) {
+          recordNetwork({
+            at: Date.now(),
+            source: 'fetch',
+            method: described.method,
+            url: described.url,
+            durationMs: Date.now() - startedAt,
+            error: inspectValue(error),
+          })
+        }
+        throw error
+      })
+    }
+
+    const Xhr = target.XMLHttpRequest
+    // oxlint-disable-next-line typescript/unbound-method -- the wrapper supplies the original XHR receiver explicitly.
+    const originalOpen = Xhr.prototype.open
+    // oxlint-disable-next-line typescript/unbound-method -- the wrapper supplies the original XHR receiver explicitly.
+    const originalSend = Xhr.prototype.send
+    const patchedOpen: typeof XMLHttpRequest.prototype.open = function patchedOpen(
+      this: XMLHttpRequest,
+      method: string,
+      url: string | URL,
+      ...rest: unknown[]
+    ): void {
+      if (active && generation === captureGeneration) {
+        xhrMeta.set(this, {
+          method: clip(method.toUpperCase() || 'GET'),
+          url: sanitizeUrl(String(url)),
+        })
+      }
+      originalOpen.apply(this, [method, url, ...rest] as Parameters<XMLHttpRequest['open']>)
+    }
+    const patchedSend: typeof XMLHttpRequest.prototype.send = function patchedSend(
+      this: XMLHttpRequest,
+      body?: Document | XMLHttpRequestBodyInit | null,
+    ): void {
+      const described = active && generation === captureGeneration ? xhrMeta.get(this) : undefined
+      if (described !== undefined) {
+        const startedAt = Date.now()
+        this.addEventListener('loadend', () => {
+          if (!active || generation !== captureGeneration) return
+          const failed = this.status === 0 && this.readyState === XMLHttpRequest.DONE
+          recordNetwork({
+            at: Date.now(),
+            source: 'xhr',
+            method: described.method,
+            url: described.url,
+            ...(failed ? {} : { status: this.status, ok: this.status >= 200 && this.status < 300 }),
+            durationMs: Date.now() - startedAt,
+            ...(failed ? { error: clip(this.statusText || 'network error') } : {}),
+          })
+        }, { once: true })
+      }
+      originalSend.call(this, body)
+    }
+
+    const consolePatches: ConsolePatch[] = []
+    for (const level of ['log', 'info', 'warn', 'error', 'debug'] as const) {
+      const original = target.console[level]
+      const patched = (...args: unknown[]): void => {
+        Reflect.apply(original, target.console, args)
+        if (!active || generation !== captureGeneration) return
+        try {
+          recordConsole(level, renderConsoleArgs(args))
+        } catch {
+          // Diagnostic recording cannot change page console behavior.
+        }
+      }
+      consolePatches.push({ level, original, patched })
+      target.console[level] = patched
+    }
+
+    installation = {
+      originalFetch,
+      patchedFetch,
+      originalOpen,
+      patchedOpen,
+      originalSend,
+      patchedSend,
+      consolePatches,
+    }
+    target.fetch = patchedFetch
+    Xhr.prototype.open = patchedOpen
+    Xhr.prototype.send = patchedSend
+    target.addEventListener('error', onError)
+    target.addEventListener('unhandledrejection', onUnhandledRejection)
+  }
+
+  /** Stop capture and restore only methods still owned by this controller. */
+  function stop(): void {
+    if (!active) return
+    active = false
+    target.removeEventListener('error', onError)
+    target.removeEventListener('unhandledrejection', onUnhandledRejection)
+    if (installation === undefined) return
+    if (target.fetch === installation.patchedFetch) target.fetch = installation.originalFetch
+    const Xhr = target.XMLHttpRequest
+    if (Xhr.prototype.open === installation.patchedOpen) Xhr.prototype.open = installation.originalOpen
+    if (Xhr.prototype.send === installation.patchedSend) Xhr.prototype.send = installation.originalSend
+    for (const patch of installation.consolePatches) {
+      if (target.console[patch.level] === patch.patched) target.console[patch.level] = patch.original
+    }
+    installation = undefined
+  }
+
+  /** Build one immutable response from the current observation state. */
+  function snapshot(requestId: string): PageProbeSnapshot {
+    return {
+      requestId,
       hooked: true,
-      hookedAt,
+      ...(hookedAt === undefined ? {} : { hookedAt }),
       network: network.slice(),
       console: consoleEntries.slice(),
       omittedNetwork,
       omittedConsole,
     }
-    target.dispatchEvent(new CustomEvent(PAGE_PROBE_SNAPSHOT_EVENT, { detail: snapshot }))
-    if (detail?.reset === true) {
-      network.length = 0
-      consoleEntries.length = 0
-      omittedNetwork = 0
-      omittedConsole = 0
-    }
+  }
+
+  target.addEventListener(PAGE_PROBE_REQUEST_EVENT, (event) => {
+    const detail: unknown = (event as CustomEvent<unknown>).detail
+    const requestId = typeof detail === 'object' && detail !== null && 'requestId' in detail
+      && typeof detail.requestId === 'string' ? detail.requestId : ''
+    const mode = typeof detail === 'object' && detail !== null && 'mode' in detail ? detail.mode : undefined
+    if (mode === 'start') start()
+    if (mode === 'stop') stop()
+    target.dispatchEvent(new CustomEvent(PAGE_PROBE_SNAPSHOT_EVENT, { detail: snapshot(requestId) }))
   })
 }
 
